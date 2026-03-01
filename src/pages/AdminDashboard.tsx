@@ -140,13 +140,7 @@ function OrdersManagement() {
                 </p>
                 <select
                   value={order.status}
-                  onChange={(e) =>
-                    handleStatusUpdate(
-                      order._id,
-                      
-                      e.target.value as any
-                    )
-                  }
+                  onChange={(e) => void handleStatusUpdate(order._id, e.target.value as any)}
                   className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 >
                   <option value="pending">Pending</option>
@@ -247,12 +241,7 @@ function ReservationsManagement() {
               <div className="flex justify-end">
                 <select
                   value={reservation.status}
-                  onChange={(e) =>
-                    handleStatusUpdate(
-                      reservation._id,
-                      e.target.value as any
-                    )
-                  }
+                  onChange={(e) => void handleStatusUpdate(reservation._id, e.target.value as any)}
                   className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 >
                   <option value="pending">Pending</option>
@@ -395,7 +384,7 @@ function MenuManagement() {
         <div className="flex space-x-2">
           {menuItems?.length === 0 && (
             <button
-              onClick={handleSeedData}
+              onClick={() => void handleSeedData()}
               disabled={isSeeding}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
             >
@@ -423,7 +412,10 @@ function MenuManagement() {
       </div>
 
       {isAdding && (
-        <form onSubmit={handleSubmit} className="mb-8 p-6 bg-gray-50 rounded-lg">
+        <form
+          onSubmit={(e) => void handleSubmit(e)}
+          className="mb-8 p-6 bg-gray-50 rounded-lg"
+        >
           <h3 className="text-lg font-bold text-gray-900 mb-4">
             {editingId ? "Edit Menu Item" : "Add New Menu Item"}
           </h3>
@@ -597,7 +589,7 @@ function MenuManagement() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(item._id)}
+                    onClick={() => void handleDelete(item._id)}
                     className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm"
                   >
                     Delete

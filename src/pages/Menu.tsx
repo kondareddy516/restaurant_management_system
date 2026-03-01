@@ -1,9 +1,8 @@
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
-import { internal } from "../../convex/_generated/api";
 
 interface MenuProps {
   onAddToCart: (item: { id: string; name: string; price: number }) => void;
@@ -13,42 +12,74 @@ type Category = "starters" | "veg" | "non-veg" | "desserts";
 
 // Mapping of menu items to image files
 const imageMapping: Record<string, string> = {
-  "Crispy Corn": "/images/Crispy Corn.jpg",
   "Chicken 65": "/images/Chicken 65.jpg",
-  "Chicken Lollipop (6 pcs)": "/images/Chicken Lollipop (6 pcs).jpg",
   "Fish Fingers": "/images/Fish Fingers.jpg",
   "Paneer Tikka": "/images/Paneer Tikka.jpg",
-  "Chicken Tikka": "/images/Chicken Tikka.jpg",
-  "Chicken Roomali Roll": "/images/Chicken Roomali Roll.jpg",
-  "Egg Roomali Roll": "/images/Egg Roomali Roll.jpg",
-  "Paneer Roomali Roll": "/images/Paneer Roomali Roll.jpg",
-  "Veg Roomali Roll": "/images/Veg Roomali Roll.jpg",
-  "Veg Spring Rolls": "/images/Veg Spring Rolls.jpg",
-  "Paneer Biryani": "/images/Paneer Biryani.jpg",
   "Veg Biryani": "/images/Veg Biryani.jpg",
-  "Hyd. Chicken Dum Biryani": "/images/Hyd. Chicken Dum Biryani.jpg",
-  "Chicken Biryani": "/images/Chicken Biryani.jpg",
-  "Mutton Biryani": "/images/Mutton Biryani.jpg",
-  "Egg Biryani": "/images/Egg Biryani.jpg",
-  "Prawns Biryani": "/images/Prawns Biryani.jpg",
-  "Hyderabadi Veg Dum Biryani": "/images/Hyderabadi Veg Dum Biryani.jpg",
-  "Gobi Manchurian": "/images/Gobi Manchurian.jpg",
-  "Egg Manchurian": "/images/Egg Manchurian.jpg",
-  "Mushroom 65": "/images/Mushroom 65.jpg",
-  "Hara Bhara Kabab": "/images/Hara Bhara Kabab.jpg",
-  "Seekh Kebab Roll": "/images/Seekh Kebab Roll.jpg",
-  "Prawns Fry": "/images/Prawns Fry.jpg",
+  "Mutton Biryani": "/images/Mutton Biryani.webp",
   "Gulab Jamun": "/images/Gulab Jamun.jpg",
-  "Gajar Halwa": "/images/Gajar Halwa.jpg",
-  "Rasmalai": "/images/Rasmalai.jpg",
-  "Falooda": "/images/Falooda.jpg",
   "Fruit Salad": "/images/Fruit Salad.webp",
-  
+  "Garlic Bread": "/images/Garlic Bread.jpg.jpg",
+  "Ras Malai": "/images/Ras Malai.jpg",
+  "Veg Biryani":"/images/Veg Biryani.webp",
+  "Crispy Spring Rolls":"/images/Crispy Spring Rolls.jpg",
+  "Paneer Tikka":"/images/Paneer Tikka.jpg",
+  "Momos":"/images/Momos.jpg",
+  "French Fries":"/images/French Fries.jpg",
+  "Onion Bhaji":"/images/Onion Bhaji.jpg",
+  "Chicken Pakora":"/images/Chicken Pakora.jpg",
+  "Veg Pakora":"/images/Veg Pakora.jpg",
+  "Fish Fingers":"/images/Fish Fingers.jpg",
+  "Cheese Balls":"/images/Cheese Balls.jpg",
+  "Pani Puri":"/images/Pani Puri.jpg",
+  "Kachori":"/images/Kachori.avif",
+  "Samosa":"/images/Samosa.jpg",
+  "Dhokla":"/images/Dhokla.avif",
+  "Paneer Butter Masala":"/images/Paneer Butter Masala.webp",
+  "Dal Makhani":"/images/Dal Makhani.webp",
+  "Chana Masala":"/images/Chana Masala.avif",
+  "Palak Paneer":"/images/Palak Paneer.webp",
+  "Aloo Gobi":"/images/Aloo Gobi.webp",
+  "Baingan Bharta":"/images/Baingan Bharta.webp",
+  "Malai Kofta":"/images/Malai Kofta.webp",
+  "Rajma":"/images/Rajma.avif",
+  "Kadai Paneer":"/images/Kadai Paneer.webp",
+  "Mushroom Masala":"/images/Mushroom Masala.jpg",
+  "Pav Bhaji":"/images/Pav Bhaji.webp",
+  "Veg Thali":"/images/Veg Thali.webp",
+  "Cheese Pizza":"/images/Cheese Pizza.webp",
+  "Veg Burger":"/images/Veg Burger.jpg",
+  "Rasgulla":"/images/Rasgulla.jpg",
+  "Kheer":"/images/Kheer.webp",
+  "Jalebi":"/images/Jalebi.webp",
+  "Rabri":"/images/Rabri.webp",
+  "Barfi":"/images/Barfi.webp",
+  "Ladoo":"/images/Ladoo.avif",
+  "Halwa":"/images/Halwa.jpg",
+  "Kulfi":"/images/Kulfi.jpg",
+  "Chocolate Brownie":"/images/Chocolate Brownie.webp",
+  "Ice Cream Sundae":"/images/Ice Cream Sundae.webp",
+  "Panna Cotta":"/images/Panna Cotta.webp",
+  "Butter Chicken":"/images/Butter Chicken.webp",
+  "Chicken Biryani":"/images/Chicken Biryani.avif",
+  "Mutton Rogan Josh":"/images/Mutton Rogan Josh.jpg",
+  "Fish Curry":"/images/Fish Curry.jpg",
+  "Chicken Tikka Masala":"/images/Chicken Tikka Masala.webp",
+  "Prawn Masala":"/images/Prawn Masala.jpg",
+  "Lamb Vindaloo":"/images/Lamb Vindaloo.jpg",
+  "Chicken Korma":"/images/Chicken Korma.webp",
+  "Beef Steak":"/images/Beef Steak.webp",
+  "Chicken Shawarma":"/images/Chicken Shawarma.avif",
+  "Fish Tikka":"/images/Fish Tikka.avif",
+  "Chicken 65 Curry":"/images/Chicken 65 Curry.jpg",
+  "Pork Vindaloo":"/images/Pork Vindaloo.jpg",
+  "Grilled Chicken":"/images/Grilled Chicken.webp",
 };
 
+
 // Get image URL for a menu item
-const getImageUrl = (itemName: string): string | null => {
-  return imageMapping[itemName] || null;
+const getImageUrl = (itemName: string): string | undefined => {
+  return imageMapping[itemName] || undefined;
 };
 
 export default function Menu({ onAddToCart }: MenuProps) {
@@ -122,7 +153,7 @@ export default function Menu({ onAddToCart }: MenuProps) {
               <div className="h-48 bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
                 {item.imageUrl || getImageUrl(item.name) ? (
                   <img
-                    src={getImageUrl(item.name) || item.imageUrl}
+                    src={getImageUrl(item.name) || item.imageUrl || ""}
                     alt={item.name}
                     className="w-full h-full object-cover"
                   />

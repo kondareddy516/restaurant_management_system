@@ -35,7 +35,7 @@ service cloud.firestore {
     }
 
     // ============================================
-    // ORDERS - Authenticated Users
+    // ORDERS - Authenticated Users + Payment Updates
     // ============================================
     match /orders/{orderId} {
       // Users can read their own orders
@@ -46,6 +46,7 @@ service cloud.firestore {
       allow create: if isAuthenticated();
 
       // Users can update their own orders, admins can update any
+      // Admins specifically handle payment status updates
       allow update: if isAuthenticated() &&
                        (request.auth.uid == resource.data.userId || isAdmin());
 
@@ -54,7 +55,7 @@ service cloud.firestore {
     }
 
     // ============================================
-    // RESERVATIONS - Authenticated Users
+    // RESERVATIONS - Authenticated Users + Status Updates
     // ============================================
     match /reservations/{reservationId} {
       // Users can read their own reservations
@@ -64,7 +65,8 @@ service cloud.firestore {
       // Anyone authenticated can create reservations
       allow create: if isAuthenticated();
 
-      // Users can update their own, admins can update any
+      // Users can update/cancel their own, admins can update any
+      // Customers can only cancel future reservations
       allow update: if isAuthenticated() &&
                        (request.auth.uid == resource.data.userId || isAdmin());
 
@@ -151,16 +153,40 @@ allow write: if isAdmin();  // Only admins can modify
 
 This allows customers to browse the menu without logging in.
 
-### Orders (Authenticated + Ownership)
+### Orders (Authenticated + Ownership + Payment Updates)
 
 ```firestore
 allow read: if isAuthenticated() &&
                (request.auth.uid == resource.data.userId || isAdmin());
+allow update: if isAuthenticated() &&
+                 (request.auth.uid == resource.data.userId || isAdmin());
 ```
 
 - Users can only see their own orders
-- Admins can see all orders
-- Unauthenticated users cannot read
+- Admins can see all orders and update any order (including payment status)
+- Unauthenticated users cannot read or update
+- **Payment Updates**: Only admins can update `paymentStatus` field
+  - Admin calls: `updatePaymentStatus(orderId, 'verified', transactionDetails)`
+  - Triggers: paymentStatus → 'paid', status → 'preparing'
+  - Audit: Each update recorded in `editHistory` array
+
+### Reservations (Authenticated + Ownership + Status Updates)
+
+```firestore
+allow read: if isAuthenticated() &&
+               (request.auth.uid == resource.data.userId || isAdmin());
+allow update: if isAuthenticated() &&
+                 (request.auth.uid == resource.data.userId || isAdmin());
+```
+
+- Users can only see their own reservations
+- Admins can see all reservations and update any status
+- Customers can only cancel future reservations (enforced in application logic)
+- **Reservation Status Updates**: Both customers and admins can update status
+  - Allowed statuses: 'pending', 'confirmed', 'cancelled', 'completed', 'no-show'
+  - Customers: Can only cancel if date is in the future
+  - Admins: Can set any status without date restrictions
+  - Audit: Each update recorded in `editHistory` array
 
 ### User Roles (Admin Only)
 
@@ -172,6 +198,56 @@ function isAdmin() {
 ```
 
 Checks the `userRoles` collection to determine admin status.
+
+## 🏛️ Payment & Reservation Update Details
+
+### Payment Status Updates (Exchequer Verification)
+
+**Flow:**
+
+1. Admin selects order in Dashboard
+2. Clicks "Verify Payment" or "Reject Payment"
+3. Modal shows UPI Transaction ID and verification details
+4. Admin confirms action
+5. `updatePaymentStatus()` called with:
+   - orderId
+   - status: 'verified' or 'rejected'
+   - transactionId
+   - transactionDetails (UPI ID, amount, timestamp, etc.)
+   - updatedBy (admin user ID)
+
+**Results:**
+
+- **Verified**: paymentStatus = 'paid', status = 'preparing'
+- **Rejected**: paymentStatus = 'failed', rejectionReason added
+- All changes appended to `editHistory` array
+
+### Reservation Status Updates (The Concierge)
+
+**Flow:**
+
+1. Admin selects reservation in Dashboard
+2. Clicks dropdown to change status
+3. Applies status change
+4. `updateReservationStatus()` called with:
+   - reservationId
+   - newStatus: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show'
+   - updatedBy (user ID)
+   - reason (optional, for audit trail)
+
+**Validation:**
+
+- Customers cannot cancel past reservations (enforced in client)
+- Only admins can mark as 'no-show'
+- All status changes recorded in `editHistory`
+
+**Status Transitions:**
+
+- pending → confirmed (Admin confirms)
+- confirmed → completed (After service)
+- Any status → cancelled (If date is future)
+- Any status → no-show (Admin marks)
+- pending → no-show (Admin marks)
 
 ## 🚨 Troubleshooting
 

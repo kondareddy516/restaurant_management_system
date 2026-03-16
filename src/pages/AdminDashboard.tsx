@@ -7,6 +7,12 @@ import {
   Order,
   Reservation,
 } from "../services/firestoreService";
+import {
+  updatePaymentStatus,
+  updateReservationStatus,
+  RoyalToastMessages,
+  RoyalColors,
+} from "../services/dbUpdates";
 import { toast } from "sonner";
 
 interface AdminDashboardProps {
@@ -69,6 +75,13 @@ export default function AdminDashboard({
 function OrdersManagement() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [paymentAction, setPaymentAction] = useState<
+    "verified" | "rejected" | null
+  >(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -100,12 +113,67 @@ function OrdersManagement() {
     try {
       await orderService.updateStatus(orderId, status);
       toast.success("Order status updated!");
-      // Refresh orders
       const allOrders = await orderService.getAll();
       setOrders(allOrders);
     } catch (error) {
       toast.error("Failed to update order status.");
       console.error(error);
+    }
+  };
+
+  const handleOpenPaymentModal = (order: Order) => {
+    setSelectedOrder(order);
+    setPaymentModal(true);
+    setPaymentAction(null);
+    setRejectionReason("");
+  };
+
+  const handlePaymentVerification = async () => {
+    if (!selectedOrder || !paymentAction) return;
+
+    setIsSubmittingPayment(true);
+    try {
+      await updatePaymentStatus({
+        orderId: selectedOrder.id!,
+        status: paymentAction,
+        transactionId: `TXN_${Date.now()}`,
+        transactionDetails: {
+          upiId:
+            selectedOrder.paymentMethod === "upi" ? "merchant@upi" : undefined,
+          timestamp: new Date().toISOString(),
+          amount: selectedOrder.totalAmount,
+        },
+        rejectionReason:
+          paymentAction === "rejected" ? rejectionReason : undefined,
+        updatedBy: "admin", // Should be actual admin user ID
+      });
+
+      // Show success toast with custom message
+      if (paymentAction === "verified") {
+        toast.success(RoyalToastMessages.payment.success, {
+          description: RoyalToastMessages.payment.successDescription(
+            `TXN_${Date.now()}`,
+          ),
+        });
+      } else {
+        toast.error(RoyalToastMessages.payment.error, {
+          description:
+            RoyalToastMessages.payment.errorDescription(rejectionReason),
+        });
+      }
+
+      // Refresh orders
+      const allOrders = await orderService.getAll();
+      setOrders(allOrders);
+      setPaymentModal(false);
+      setSelectedOrder(null);
+    } catch (error) {
+      toast.error(RoyalToastMessages.payment.error, {
+        description: (error as Error).message,
+      });
+      console.error("Payment update error:", error);
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -123,6 +191,20 @@ function OrdersManagement() {
         return "bg-red-100 text-red-800";
       default:
         return "bg-orange-100 text-orange-800";
+    }
+  };
+
+  const getPaymentStatusColor = (status?: string) => {
+    switch (status) {
+      case "completed":
+      case "paid":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -158,13 +240,22 @@ function OrdersManagement() {
                       : ""}
                   </p>
                 </div>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                    order.status,
-                  )}`}
-                >
-                  {order.status}
-                </span>
+                <div className="flex gap-2">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+                      order.status,
+                    )}`}
+                  >
+                    {order.status}
+                  </span>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(
+                      order.paymentStatus,
+                    )}`}
+                  >
+                    {order.paymentStatus || "pending"}
+                  </span>
+                </div>
               </div>
 
               <div className="mb-3">
@@ -179,28 +270,166 @@ function OrdersManagement() {
               </div>
 
               <div className="flex justify-between items-center">
-                <p className="font-bold text-orange-600">
-                  ₹{order.totalAmount.toFixed(2)}
-                </p>
-                {order.id && (
-                  <select
-                    value={order.status}
-                    onChange={(e) =>
-                      void handleStatusUpdate(order.id!, e.target.value as any)
-                    }
-                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="preparing">Preparing</option>
-                    <option value="ready">Ready</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                )}
+                <div>
+                  <p className="font-bold text-orange-600">
+                    ₹{order.totalAmount.toFixed(2)}
+                  </p>
+                  {order.paymentMethod && (
+                    <p className="text-xs text-gray-500">
+                      Payment: {order.paymentMethod.toUpperCase()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2 items-center">
+                  {order.paymentStatus === "pending" && (
+                    <button
+                      onClick={() => handleOpenPaymentModal(order)}
+                      style={{ backgroundColor: RoyalColors.copper }}
+                      className="px-3 py-1 text-white rounded text-sm hover:opacity-90 transition-opacity font-medium"
+                    >
+                      Verify Payment
+                    </button>
+                  )}
+                  {order.id && (
+                    <select
+                      value={order.status}
+                      onChange={(e) =>
+                        void handleStatusUpdate(
+                          order.id!,
+                          e.target.value as any,
+                        )
+                      }
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="preparing">Preparing</option>
+                      <option value="ready">Ready</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  )}
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Payment Verification Modal */}
+      {paymentModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div
+            className="bg-white rounded-lg p-8 max-w-md w-full"
+            style={{ borderTop: `4px solid ${RoyalColors.copper}` }}
+          >
+            <h3
+              className="text-2xl font-bold mb-6"
+              style={{ color: RoyalColors.deepBurgundy }}
+            >
+              🏛️ Exchequer Verification
+            </h3>
+
+            {/* Order & Payment Details */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Order ID:</span>
+                <span className="font-bold">{selectedOrder.id?.slice(-6)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Amount:</span>
+                <span className="font-bold">
+                  ₹{selectedOrder.totalAmount.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Payment Method:</span>
+                <span className="font-bold">
+                  {selectedOrder.paymentMethod?.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Customer:</span>
+                <span className="font-bold">{selectedOrder.customerName}</span>
+              </div>
+            </div>
+
+            {/* Action Selection */}
+            {!paymentAction ? (
+              <div className="space-y-3">
+                <button
+                  onClick={() => setPaymentAction("verified")}
+                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                >
+                  ✓ Verify Payment
+                </button>
+                <button
+                  onClick={() => setPaymentAction("rejected")}
+                  className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  ✗ Reject Payment
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {paymentAction === "rejected" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rejection Reason
+                    </label>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Enter reason for rejection..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent text-sm"
+                      rows={3}
+                    />
+                  </div>
+                )}
+
+                <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800">
+                  {paymentAction === "verified"
+                    ? "✓ Payment will be marked as PAID and order status will move to PREPARING"
+                    : "✗ Payment will be marked as FAILED and order will require manual action"}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPaymentAction(null)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handlePaymentVerification}
+                    disabled={
+                      isSubmittingPayment ||
+                      (paymentAction === "rejected" && !rejectionReason.trim())
+                    }
+                    style={{
+                      backgroundColor:
+                        paymentAction === "verified" ? "#22c55e" : "#ef4444",
+                    }}
+                    className="flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingPayment ? "Processing..." : "Confirm"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setPaymentModal(false);
+                setSelectedOrder(null);
+                setPaymentAction(null);
+                setRejectionReason("");
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -210,6 +439,7 @@ function OrdersManagement() {
 function ReservationsManagement() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchReservations = async () => {
@@ -230,16 +460,43 @@ function ReservationsManagement() {
 
   const handleStatusUpdate = async (
     reservationId: string,
-    status: "pending" | "confirmed" | "cancelled" | "completed",
+    status: "pending" | "confirmed" | "cancelled" | "completed" | "no-show",
   ) => {
     try {
-      await reservationService.updateStatus(reservationId, status);
-      toast.success("Reservation status updated!");
+      await updateReservationStatus(
+        {
+          reservationId,
+          newStatus: status,
+          updatedBy: "admin",
+        },
+        "admin",
+      );
+
+      // Show appropriate toast message
+      if (status === "confirmed") {
+        toast.success(RoyalToastMessages.reservation.success, {
+          description: "Reservation confirmed",
+        });
+      } else if (status === "cancelled") {
+        toast.success(RoyalToastMessages.reservation.success, {
+          description: "Reservation cancelled",
+        });
+      } else if (status === "completed") {
+        toast.success(RoyalToastMessages.reservation.success, {
+          description: "Reservation completed",
+        });
+      } else if (status === "no-show") {
+        toast.success("Reservation marked as no-show");
+      }
+
       // Refresh reservations
       const allReservations = await reservationService.getAll();
       setReservations(allReservations);
+      setExpandedId(null);
     } catch (error) {
-      toast.error("Failed to update reservation status.");
+      toast.error(RoyalToastMessages.reservation.error, {
+        description: (error as Error).message,
+      });
       console.error(error);
     }
   };
@@ -254,9 +511,18 @@ function ReservationsManagement() {
         return "bg-red-100 text-red-800";
       case "completed":
         return "bg-blue-100 text-blue-800";
+      case "no-show":
+        return "bg-purple-100 text-purple-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
+  };
+
+  const isReservationInFuture = (date: string): boolean => {
+    const reservationDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return reservationDate >= today;
   };
 
   return (
@@ -278,7 +544,7 @@ function ReservationsManagement() {
               className="border border-gray-200 rounded-lg p-4"
             >
               <div className="flex justify-between items-start mb-3">
-                <div>
+                <div className="flex-1">
                   <h3 className="font-bold text-gray-900">
                     {reservation.customerName}
                   </h3>
@@ -306,24 +572,60 @@ function ReservationsManagement() {
                 </span>
               </div>
 
-              <div className="flex justify-end">
-                {reservation.id && (
-                  <select
-                    value={reservation.status}
-                    onChange={(e) =>
-                      void handleStatusUpdate(
-                        reservation.id!,
-                        e.target.value as any,
-                      )
-                    }
-                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+              {/* Quick Action Dropdown */}
+              <div className="flex items-center gap-2">
+                {reservation.id && !expandedId ? (
+                  <button
+                    onClick={() => setExpandedId(reservation.id!)}
+                    style={{ backgroundColor: RoyalColors.copper }}
+                    className="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity font-medium text-sm"
                   >
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                )}
+                    Quick Action ▼
+                  </button>
+                ) : expandedId === reservation.id ? (
+                  <div className="flex flex-wrap gap-2 w-full">
+                    <button
+                      onClick={() =>
+                        void handleStatusUpdate(reservation.id!, "confirmed")
+                      }
+                      className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
+                    >
+                      ✓ Confirm
+                    </button>
+                    <button
+                      onClick={() =>
+                        void handleStatusUpdate(reservation.id!, "completed")
+                      }
+                      className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                    >
+                      ✓ Complete
+                    </button>
+                    {isReservationInFuture(reservation.date) && (
+                      <button
+                        onClick={() =>
+                          void handleStatusUpdate(reservation.id!, "cancelled")
+                        }
+                        className="px-3 py-1 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors"
+                      >
+                        ✗ Cancel
+                      </button>
+                    )}
+                    <button
+                      onClick={() =>
+                        void handleStatusUpdate(reservation.id!, "no-show")
+                      }
+                      className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 transition-colors"
+                    >
+                      ⊘ No-Show
+                    </button>
+                    <button
+                      onClick={() => setExpandedId(null)}
+                      className="px-3 py-1 border border-gray-300 text-gray-700 rounded text-sm hover:bg-gray-50 transition-colors ml-auto"
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}

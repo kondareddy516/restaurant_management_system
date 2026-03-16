@@ -11,7 +11,7 @@ export default function Home({ onNavigate }: HomeProps) {
   const currentYear = new Date().getFullYear();
 
   // Get first 3 available items as featured
-  const featuredDishes = featuredItems?.filter(item => item.available).slice(0, 3) || [];
+  //const featuredDishes = featuredItems?.filter(item => item.available).slice(0, 3) || [];
 
   return (
     <div className="min-h-screen">
@@ -105,7 +105,7 @@ export default function Home({ onNavigate }: HomeProps) {
             </p>
           </div>
 
-          {featuredDishes.length > 0 ? (
+          {/* {featuredDishes.length > 0 ? (
             <div className="grid md:grid-cols-3 gap-8 mb-12">
               {featuredDishes.map((item) => (
                 <div key={item._id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
@@ -152,7 +152,7 @@ export default function Home({ onNavigate }: HomeProps) {
               <div className="text-6xl mb-4">🍽️</div>
               <p className="text-xl text-gray-600">Featured dishes coming soon!</p>
             </div>
-          )}
+          )} */}
 
           <div className="text-center">
             <button
@@ -354,23 +354,15 @@ export default function Home({ onNavigate }: HomeProps) {
           <div className="grid md:grid-cols-2 gap-12">
             <div>
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Location</h3>
-              <div className="bg-gray-200 h-64 rounded-lg flex items-center justify-center mb-6">
+              {/* <div className="bg-gray-200 h-64 rounded-lg flex items-center justify-center mb-6">
                 <span className="text-gray-600">🗺️ Google Map Placeholder</span>
-              </div>
-              <div className="space-y-4">
-                <p className="flex items-center text-gray-600">
-                  <span className="mr-3">📍</span>
-                  123 Culinary Street, Food District, City 12345
-                </p>
-                <p className="flex items-center text-gray-600">
-                  <span className="mr-3">📞</span>
-                  +91 98765 43210
-                </p>
-                <p className="flex items-center text-gray-600">
-                  <span className="mr-3">✉️</span>
-                  info@restauranthub.com
-                </p>
-              </div>
+              </div> */}
+              <ul className="space-y-2 text-gray-400">
+                <li>+91 6300522709</li>
+                <li>info@restauranthub.com</li>
+                <li>123 brodipet Street</li>
+                <li>Food District, guntur 12345</li>
+              </ul>
             </div>
 
             <div>

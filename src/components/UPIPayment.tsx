@@ -99,24 +99,63 @@ const UPIPayment: React.FC<UPIPaymentProps> = ({
 
   // Handle transaction ID submission
   const handleSubmitTransaction = async () => {
+    // Pre-submission validation
+    if (!transactionId || transactionId.trim() === "") {
+      toast.error("Transaction ID is required", {
+        style: {
+          backgroundColor: "#2D0B0B",
+          color: "#F3E5AB",
+          border: "1px solid #B87333",
+        },
+      });
+      return;
+    }
+
+    if (!orderId || orderId.trim() === "") {
+      toast.error("Order ID is missing. Cannot process payment.", {
+        style: {
+          backgroundColor: "#2D0B0B",
+          color: "#F3E5AB",
+          border: "1px solid #B87333",
+        },
+      });
+      return;
+    }
+
     if (!isValidTransactionId(transactionId)) {
-      toast.error("Invalid Transaction ID. Must be exactly 12 digits.");
+      toast.error("Invalid Transaction ID. Must be exactly 12 digits.", {
+        style: {
+          backgroundColor: "#2D0B0B",
+          color: "#F3E5AB",
+          border: "1px solid #B87333",
+        },
+      });
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Update order in Firestore
+      // Update order in Firestore with explicit paymentStatus
       if (orderId) {
-        await orderService.updateStatus(orderId, "confirmed");
+        await orderService.updateStatus(
+          orderId,
+          "confirmed",
+          "waiting_verification",
+        );
       }
 
       toast.success("Payment submitted for verification!");
       setPaymentStep("verification");
     } catch (error) {
       console.error("Payment submission error:", error);
-      toast.error("Failed to submit payment. Please try again.");
+      toast.error("Failed to submit payment. Please try again.", {
+        style: {
+          backgroundColor: "#2D0B0B",
+          color: "#F3E5AB",
+          border: "1px solid #B87333",
+        },
+      });
       setIsSubmitting(false);
     }
   };
@@ -438,8 +477,14 @@ const UPIPayment: React.FC<UPIPaymentProps> = ({
         >
           {isSubmitting ? (
             <div className="flex items-center justify-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Verifying...
+              <div
+                className="w-4 h-4 border-2 border-t-2 rounded-full animate-spin"
+                style={{
+                  borderColor: "rgba(255, 255, 255, 0.3)",
+                  borderTopColor: "#B87333",
+                }}
+              />
+              Verifying Payment...
             </div>
           ) : (
             "CONFIRM PAYMENT"

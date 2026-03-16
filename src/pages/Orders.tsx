@@ -28,9 +28,21 @@ export default function Orders({ userId, userRole }: OrdersProps) {
       } catch (err) {
         console.error("Error fetching orders:", err);
         const errMessage = err instanceof Error ? err.message : String(err);
+        const errCode = (err as any)?.code;
 
-        // Check if it's a Firestore index error
-        if (errMessage.includes("index") || errMessage.includes("composite")) {
+        // Check specifically for failed-precondition (Firestore index error)
+        if (
+          errCode === "failed-precondition" ||
+          errMessage.includes("Royal Archives are being indexed")
+        ) {
+          const indexError =
+            "The Royal Archives are being indexed. Please refresh in a few moments.";
+          setError(indexError);
+          toast.error(indexError);
+        } else if (
+          errMessage.includes("index") ||
+          errMessage.includes("composite")
+        ) {
           const indexError =
             "Firestore indexes are being created. Please refresh in a moment.";
           setError(indexError);
@@ -83,19 +95,83 @@ export default function Orders({ userId, userRole }: OrdersProps) {
               border: "1px solid #B87333",
             }}
           >
-            <p style={{ color: "#F3E5AB", fontSize: "16px", margin: "0" }}>
-              ⚠️ {error}
-            </p>
-            <p
-              style={{
-                color: "#B87333",
-                fontSize: "13px",
-                marginTop: "8px",
-                margin: "8px 0 0 0",
-              }}
-            >
-              Try refreshing the page in a few moments.
-            </p>
+            {error.includes("Royal Archives") ? (
+              <>
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>📚</div>
+                <h3
+                  style={{
+                    color: "#F3E5AB",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                    marginBottom: "12px",
+                    fontFamily: "Cormorant Garamond, serif",
+                  }}
+                >
+                  The Royal Archives Are Being Indexed
+                </h3>
+                <p
+                  style={{
+                    color: "#F3E5AB",
+                    fontSize: "14px",
+                    lineHeight: "1.6",
+                    marginBottom: "16px",
+                  }}
+                >
+                  Your orders are securely stored in the Royal Archives, which
+                  are currently being indexed for optimal retrieval.
+                </p>
+                <p
+                  style={{
+                    color: "#FFD700",
+                    fontSize: "13px",
+                    marginBottom: "16px",
+                    fontStyle: "italic",
+                  }}
+                >
+                  ⏱️ This process typically takes 2-5 minutes.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  style={{
+                    backgroundColor: "#B87333",
+                    color: "#FFFFFF",
+                    padding: "10px 20px",
+                    borderRadius: "6px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    transition: "background-color 0.3s",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLButtonElement).style.backgroundColor =
+                      "#A0632D";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLButtonElement).style.backgroundColor =
+                      "#B87333";
+                  }}
+                >
+                  Refresh Page
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ color: "#F3E5AB", fontSize: "16px", margin: "0" }}>
+                  ⚠️ {error}
+                </p>
+                <p
+                  style={{
+                    color: "#B87333",
+                    fontSize: "13px",
+                    marginTop: "8px",
+                    margin: "8px 0 0 0",
+                  }}
+                >
+                  Try refreshing the page in a few moments.
+                </p>
+              </>
+            )}
           </div>
         ) : orders.length === 0 ? (
           <div className="text-center py-20">

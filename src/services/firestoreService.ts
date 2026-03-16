@@ -57,7 +57,7 @@ export interface Order {
     | "cancelled";
   specialInstructions?: string;
   paymentMethod?: "upi" | "card" | "cash";
-  paymentStatus?: "pending" | "completed" | "failed";
+  paymentStatus?: "pending" | "waiting_verification" | "completed" | "failed";
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -104,14 +104,30 @@ export interface User {
  */
 
 async function getQueryResults<T>(q: Query): Promise<T[]> {
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(
-    (doc) =>
-      ({
-        id: doc.id,
-        ...doc.data(),
-      }) as T,
-  );
+  try {
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(
+      (doc) =>
+        ({
+          id: doc.id,
+          ...doc.data(),
+        }) as T,
+    );
+  } catch (error: any) {
+    // Check for Firestore index missing error
+    if (
+      error?.code === "failed-precondition" ||
+      error?.message?.includes("index") ||
+      error?.message?.includes("composite")
+    ) {
+      const indexError = new Error(
+        "The Royal Archives are being indexed. Please refresh in a few moments.",
+      );
+      (indexError as any).code = "failed-precondition";
+      throw indexError;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -238,13 +254,18 @@ export const orderService = {
   async updateStatus(
     id: string,
     status: Order["status"],
-    paymentStatus?: "completed" | "failed",
+    paymentStatus?: "pending" | "waiting_verification" | "completed" | "failed",
   ): Promise<void> {
     const docRef = doc(db, "orders", id);
+
+    // Ensure paymentStatus is never undefined - default to 'waiting_verification'
+    const finalPaymentStatus =
+      paymentStatus ||
+      (status === "completed" ? "completed" : "waiting_verification");
+
     await updateDoc(docRef, {
       status,
-      paymentStatus:
-        paymentStatus || status === "completed" ? "completed" : undefined,
+      paymentStatus: finalPaymentStatus,
       updatedAt: Timestamp.now(),
     });
   },

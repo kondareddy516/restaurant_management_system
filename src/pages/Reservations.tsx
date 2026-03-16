@@ -61,26 +61,39 @@ export default function Reservations({ userId }: ReservationsProps) {
     e.preventDefault();
 
     if (!customerName || !customerPhone || !date || !time) {
-      toast.error("Please fill in all required fields!");
+      toast.error("Please fill in all required fields!", {
+        style: {
+          backgroundColor: "#2D0B0B",
+          color: "#F3E5AB",
+          border: "1px solid #B87333",
+        },
+      });
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      // Ensure NO undefined values - all fields have fallbacks
       await reservationService.create({
-        userId,
-        customerName,
-        customerEmail: customerEmail || undefined,
-        customerPhone,
-        date,
-        time,
-        numberOfGuests,
-        specialRequests: specialRequests || undefined,
+        userId: userId || "",
+        customerName: customerName || "",
+        customerEmail: customerEmail || "",
+        customerPhone: customerPhone || "",
+        date: date || "",
+        time: time || "",
+        numberOfGuests: numberOfGuests || 1,
+        specialRequests: specialRequests || "",
         status: "pending",
       });
 
-      toast.success("Reservation request submitted successfully!");
+      toast.success("Reservation request submitted successfully!", {
+        style: {
+          backgroundColor: "#2D0B0B",
+          color: "#F3E5AB",
+          border: "1px solid #B87333",
+        },
+      });
       setCustomerName("");
       setCustomerEmail("");
       setCustomerPhone("");
@@ -100,8 +113,14 @@ export default function Reservations({ userId }: ReservationsProps) {
         setMyReservations(updated);
       }
     } catch (error) {
-      toast.error("Failed to create reservation. Please try again.");
-      console.error(error);
+      console.error("Reservation submission error:", error);
+      toast.error("Failed to create reservation. Please try again.", {
+        style: {
+          backgroundColor: "#2D0B0B",
+          color: "#F3E5AB",
+          border: "1px solid #B87333",
+        },
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -249,9 +268,25 @@ export default function Reservations({ userId }: ReservationsProps) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-6 py-3 text-white rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: isSubmitting ? "#B87333" : "#E67E22",
+                }}
               >
-                {isSubmitting ? "Submitting..." : "Reserve Table"}
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div
+                      className="w-4 h-4 border-2 border-t-2 rounded-full animate-spin"
+                      style={{
+                        borderColor: "rgba(255, 255, 255, 0.3)",
+                        borderTopColor: "#FFFFFF",
+                      }}
+                    />
+                    Submitting Reservation...
+                  </div>
+                ) : (
+                  "Reserve Table"
+                )}
               </button>
             </form>
           </div>

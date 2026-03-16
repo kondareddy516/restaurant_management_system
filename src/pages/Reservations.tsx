@@ -1,9 +1,12 @@
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { reservationService, Reservation } from "../services/firestoreService";
 import { toast } from "sonner";
 
-export default function Reservations() {
+interface ReservationsProps {
+  userId?: string;
+}
+
+export default function Reservations({ userId }: ReservationsProps) {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -13,10 +16,32 @@ export default function Reservations() {
   const [specialRequests, setSpecialRequests] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const createReservation = useMutation(api.reservations.create);
-  const myReservations = useQuery(api.reservations.list, {});
-  const loggedInUser = useQuery(api.auth.loggedInUser);
-  const cancelReservation = useMutation(api.reservations.cancel);
+  const [myReservations, setMyReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch user's reservations
+  useEffect(() => {
+    const fetchReservations = async () => {
+      if (!userId) return;
+      setLoading(true);
+      try {
+        const reservations = await reservationService.getAll(
+          userId,
+          undefined,
+          undefined,
+          "customer",
+        );
+        setMyReservations(reservations);
+      } catch (err) {
+        console.error("Error fetching reservations:", err);
+        toast.error("Failed to load reservations");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReservations();
+  }, [userId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +54,8 @@ export default function Reservations() {
     setIsSubmitting(true);
 
     try {
-      await createReservation({
+      await reservationService.create({
+        userId,
         customerName,
         customerEmail: customerEmail || undefined,
         customerPhone,
@@ -37,6 +63,7 @@ export default function Reservations() {
         time,
         numberOfGuests,
         specialRequests: specialRequests || undefined,
+        status: "pending",
       });
 
       toast.success("Reservation request submitted successfully!");
@@ -47,6 +74,17 @@ export default function Reservations() {
       setTime("");
       setNumberOfGuests(2);
       setSpecialRequests("");
+
+      // Refresh reservations list
+      if (userId) {
+        const updated = await reservationService.getAll(
+          userId,
+          undefined,
+          undefined,
+          "customer",
+        );
+        setMyReservations(updated);
+      }
     } catch (error) {
       toast.error("Failed to create reservation. Please try again.");
       console.error(error);
@@ -57,8 +95,18 @@ export default function Reservations() {
 
   const handleCancel = async (id: string) => {
     try {
-      await cancelReservation({ id: id as any });
+      await reservationService.cancel(id);
       toast.success("Reservation cancelled successfully!");
+      // Refresh reservations list
+      if (userId) {
+        const updated = await reservationService.getAll(
+          userId,
+          undefined,
+          undefined,
+          "customer",
+        );
+        setMyReservations(updated);
+      }
     } catch (error) {
       toast.error("Failed to cancel reservation.");
       console.error(error);
@@ -100,7 +148,7 @@ export default function Reservations() {
                 type="text"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                placeholder={loggedInUser?.name || "Your name"}
+                placeholder="Your name"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 required
               />
@@ -113,7 +161,7 @@ export default function Reservations() {
                 type="email"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder={loggedInUser?.email || "your@email.com"}
+                placeholder="your@email.com"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
               />
             </div>
@@ -197,7 +245,7 @@ export default function Reservations() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
             My Reservations
           </h2>
-          {myReservations === undefined ? (
+          {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
             </div>
@@ -209,7 +257,7 @@ export default function Reservations() {
             <div className="space-y-4">
               {myReservations.map((reservation) => (
                 <div
-                  key={reservation._id}
+                  key={reservation.id}
                   className="border border-gray-200 rounded-lg p-4"
                 >
                   <div className="flex justify-between items-start mb-2">
@@ -223,7 +271,7 @@ export default function Reservations() {
                     </div>
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                        reservation.status
+                        reservation.status,
                       )}`}
                     >
                       {reservation.status}
@@ -238,9 +286,9 @@ export default function Reservations() {
                       </p>
                     )}
                   </div>
-                  {reservation.status === "pending" && (
+                  {reservation.status === "pending" && reservation.id && (
                     <button
-                      onClick={() => handleCancel(reservation._id)}
+                      onClick={() => handleCancel(reservation.id!)}
                       className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium"
                     >
                       Cancel Reservation

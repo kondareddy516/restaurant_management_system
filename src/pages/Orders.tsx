@@ -1,8 +1,40 @@
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useEffect, useState } from "react";
+import { orderService, Order } from "../services/firestoreService";
+import { toast } from "sonner";
 
-export default function Orders() {
-  const orders = useQuery(api.orders.list, {});
+interface OrdersProps {
+  userId?: string;
+  userRole: string;
+}
+
+export default function Orders({ userId, userRole }: OrdersProps) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch orders when component mounts or userId/userRole changes
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const fetchedOrders = await orderService.getAll(
+          userId,
+          undefined,
+          userRole,
+        );
+        setOrders(fetchedOrders);
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+        setError("Failed to load orders");
+        toast.error("Failed to load orders");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [userId, userRole]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -25,9 +57,13 @@ export default function Orders() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h1 className="text-4xl font-bold text-gray-900 mb-8">My Orders</h1>
 
-      {orders === undefined ? (
+      {loading ? (
         <div className="flex justify-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+        </div>
+      ) : error ? (
+        <div className="text-center py-20">
+          <p className="text-xl text-red-600">{error}</p>
         </div>
       ) : orders.length === 0 ? (
         <div className="text-center py-20">
@@ -43,21 +79,23 @@ export default function Orders() {
         <div className="space-y-6">
           {orders.map((order) => (
             <div
-              key={order._id}
+              key={order.id}
               className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">
-                    Order #{order._id.slice(-6)}
+                    Order #{order.id?.slice(-6) || ""}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    {new Date(order._creationTime).toLocaleString()}
+                    {order.createdAt
+                      ? new Date(order.createdAt.toMillis()).toLocaleString()
+                      : ""}
                   </p>
                 </div>
                 <span
                   className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
-                    order.status
+                    order.status,
                   )}`}
                 >
                   {order.status}
@@ -73,9 +111,7 @@ export default function Orders() {
                       className="flex justify-between items-center"
                     >
                       <div className="flex-1">
-                        <p className="text-gray-900">
-                          {item.menuItem?.name || "Unknown Item"}
-                        </p>
+                        <p className="text-gray-900">{item.name}</p>
                         <p className="text-sm text-gray-600">
                           Qty: {item.quantity} × ₹{item.price.toFixed(2)}
                         </p>

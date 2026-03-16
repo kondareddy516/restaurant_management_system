@@ -1,11 +1,9 @@
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { useState } from "react";
-import { Id } from "../../convex/_generated/dataModel";
+import { useState, useEffect } from "react";
+import { menuService, MenuItem } from "../services/firestoreService";
 import { toast } from "sonner";
 
 interface MenuProps {
-  onAddToCart: (item: { id: string; name: string; price: number }) => void;
+  addToCart: (item: { id: string; name: string; price: number }) => void;
 }
 
 type Category = "starters" | "veg" | "non-veg" | "desserts";
@@ -20,72 +18,71 @@ const imageMapping: Record<string, string> = {
   "Fruit Salad": "/images/Fruit Salad.webp",
   "Garlic Bread": "/images/Garlic Bread.jpg.jpg",
   "Ras Malai": "/images/Ras Malai.jpg",
-  "Veg Biryani":"/images/Veg Biryani.webp",
-  "Crispy Spring Rolls":"/images/Crispy Spring Rolls.jpg",
-  "Momos":"/images/Momos.jpg",
-  "French Fries":"/images/French Fries.jpg",
-  "Onion Bhaji":"/images/Onion Bhaji.jpg",
-  "Chicken Pakora":"/images/Chicken Pakora.jpg",
-  "Veg Pakora":"/images/Veg Pakora.jpg",
-  "Cheese Balls":"/images/Cheese Balls.jpg",
-  "Pani Puri":"/images/Pani Puri.jpg",
-  "Kachori":"/images/Kachori.avif",
-  "Samosa":"/images/Samosa.jpg",
-  "Dhokla":"/images/Dhokla.avif",
-  "Paneer Butter Masala":"/images/Paneer Butter Masala.webp",
-  "Dal Makhani":"/images/Dal Makhani.webp",
-  "Chana Masala":"/images/Chana Masala.avif",
-  "Palak Paneer":"/images/Palak Paneer.webp",
-  "Aloo Gobi":"/images/Aloo Gobi.webp",
-  "Baingan Bharta":"/images/Baingan Bharta.webp",
-  "Malai Kofta":"/images/Malai Kofta.webp",
-  "Rajma":"/images/Rajma.avif",
-  "Kadai Paneer":"/images/Kadai Paneer.webp",
-  "Mushroom Masala":"/images/Mushroom Masala.jpg",
-  "Pav Bhaji":"/images/Pav Bhaji.webp",
-  "Veg Thali":"/images/Veg Thali.webp",
-  "Cheese Pizza":"/images/Cheese Pizza.webp",
-  "Veg Burger":"/images/Veg Burger.jpg",
-  "Rasgulla":"/images/Rasgulla.jpg",
-  "Kheer":"/images/Kheer.webp",
-  "Jalebi":"/images/Jalebi.webp",
-  "Rabri":"/images/Rabri.webp",
-  "Barfi":"/images/Barfi.webp",
-  "Ladoo":"/images/Ladoo.avif",
-  "Halwa":"/images/Halwa.jpg",
-  "Kulfi":"/images/Kulfi.jpg",
-  "Chocolate Brownie":"/images/Chocolate Brownie.webp",
-  "Ice Cream Sundae":"/images/Ice Cream Sundae.webp",
-  "Panna Cotta":"/images/Panna Cotta.webp",
-  "Butter Chicken":"/images/Butter Chicken.webp",
-  "Chicken Biryani":"/images/Chicken Biryani.avif",
-  "Mutton Rogan Josh":"/images/Mutton Rogan Josh.jpg",
-  "Fish Curry":"/images/Fish Curry.jpg",
-  "Chicken Tikka Masala":"/images/Chicken Tikka Masala.webp",
-  "Prawn Masala":"/images/Prawn Masala.jpg",
-  "Lamb Vindaloo":"/images/Lamb Vindaloo.jpg",
-  "Chicken Korma":"/images/Chicken Korma.webp",
-  "Beef Steak":"/images/Beef Steak.webp",
-  "Chicken Shawarma":"/images/Chicken Shawarma.avif",
-  "Fish Tikka":"/images/Fish Tikka.avif",
-  "Chicken 65 Curry":"/images/Chicken 65 Curry.jpg",
-  "Pork Vindaloo":"/images/Pork Vindaloo.jpg",
-  "Grilled Chicken":"/images/Grilled Chicken.webp",
+  "Veg Biryani": "/images/Veg Biryani.webp",
+  "Crispy Spring Rolls": "/images/Crispy Spring Rolls.jpg",
+  Momos: "/images/Momos.jpg",
+  "French Fries": "/images/French Fries.jpg",
+  "Onion Bhaji": "/images/Onion Bhaji.jpg",
+  "Chicken Pakora": "/images/Chicken Pakora.jpg",
+  "Veg Pakora": "/images/Veg Pakora.jpg",
+  "Cheese Balls": "/images/Cheese Balls.jpg",
+  "Pani Puri": "/images/Pani Puri.jpg",
+  Kachori: "/images/Kachori.avif",
+  Samosa: "/images/Samosa.jpg",
+  Dhokla: "/images/Dhokla.avif",
+  "Paneer Butter Masala": "/images/Paneer Butter Masala.webp",
+  "Dal Makhani": "/images/Dal Makhani.webp",
+  "Chana Masala": "/images/Chana Masala.avif",
+  "Palak Paneer": "/images/Palak Paneer.webp",
+  "Aloo Gobi": "/images/Aloo Gobi.webp",
+  "Baingan Bharta": "/images/Baingan Bharta.webp",
+  "Malai Kofta": "/images/Malai Kofta.webp",
+  Rajma: "/images/Rajma.avif",
+  "Kadai Paneer": "/images/Kadai Paneer.webp",
+  "Mushroom Masala": "/images/Mushroom Masala.jpg",
+  "Pav Bhaji": "/images/Pav Bhaji.webp",
+  "Veg Thali": "/images/Veg Thali.webp",
+  "Cheese Pizza": "/images/Cheese Pizza.webp",
+  "Veg Burger": "/images/Veg Burger.jpg",
+  Rasgulla: "/images/Rasgulla.jpg",
+  Kheer: "/images/Kheer.webp",
+  Jalebi: "/images/Jalebi.webp",
+  Rabri: "/images/Rabri.webp",
+  Barfi: "/images/Barfi.webp",
+  Ladoo: "/images/Ladoo.avif",
+  Halwa: "/images/Halwa.jpg",
+  Kulfi: "/images/Kulfi.jpg",
+  "Chocolate Brownie": "/images/Chocolate Brownie.webp",
+  "Ice Cream Sundae": "/images/Ice Cream Sundae.webp",
+  "Panna Cotta": "/images/Panna Cotta.webp",
+  "Butter Chicken": "/images/Butter Chicken.webp",
+  "Chicken Biryani": "/images/Chicken Biryani.avif",
+  "Mutton Rogan Josh": "/images/Mutton Rogan Josh.jpg",
+  "Fish Curry": "/images/Fish Curry.jpg",
+  "Chicken Tikka Masala": "/images/Chicken Tikka Masala.webp",
+  "Prawn Masala": "/images/Prawn Masala.jpg",
+  "Lamb Vindaloo": "/images/Lamb Vindaloo.jpg",
+  "Chicken Korma": "/images/Chicken Korma.webp",
+  "Beef Steak": "/images/Beef Steak.webp",
+  "Chicken Shawarma": "/images/Chicken Shawarma.avif",
+  "Fish Tikka": "/images/Fish Tikka.avif",
+  "Chicken 65 Curry": "/images/Chicken 65 Curry.jpg",
+  "Pork Vindaloo": "/images/Pork Vindaloo.jpg",
+  "Grilled Chicken": "/images/Grilled Chicken.webp",
 };
-
 
 // Get image URL for a menu item
 const getImageUrl = (itemName: string): string | undefined => {
   return imageMapping[itemName] || undefined;
 };
 
-export default function Menu({ onAddToCart }: MenuProps) {
-  const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(
-    undefined
-  );
-  const menuItems = useQuery(api.menuItems.list, {
-    category: selectedCategory,
-  });
+export default function Menu({ addToCart }: MenuProps) {
+  const [selectedCategory, setSelectedCategory] = useState<
+    Category | undefined
+  >(undefined);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const categories = [
     { id: undefined, name: "All", icon: "🍽️" },
@@ -95,13 +92,31 @@ export default function Menu({ onAddToCart }: MenuProps) {
     { id: "desserts" as Category, name: "Desserts", icon: "🍰" },
   ];
 
-  const handleAddToCart = (item: {
-    _id: Id<"menuItems">;
-    name: string;
-    price: number;
-  }) => {
-    onAddToCart({ id: item._id, name: item.name, price: item.price });
-    toast.success(`${item.name} added to cart!`);
+  // Fetch menu items when category changes
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const items = await menuService.getAll(selectedCategory);
+        setMenuItems(items);
+      } catch (err) {
+        console.error("Error fetching menu items:", err);
+        setError("Failed to load menu items");
+        toast.error("Failed to load menu items");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMenuItems();
+  }, [selectedCategory]);
+
+  const handleAddToCart = (item: MenuItem) => {
+    if (item.id && item.name) {
+      addToCart({ id: item.id, name: item.name, price: item.price });
+      toast.success(`${item.name} added to cart!`);
+    }
   };
 
   return (
@@ -130,9 +145,13 @@ export default function Menu({ onAddToCart }: MenuProps) {
         ))}
       </div>
 
-      {menuItems === undefined ? (
+      {loading ? (
         <div className="flex justify-center items-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+        </div>
+      ) : error ? (
+        <div className="text-center py-20">
+          <p className="text-xl text-red-600">{error}</p>
         </div>
       ) : menuItems.length === 0 ? (
         <div className="text-center py-20">
@@ -144,7 +163,7 @@ export default function Menu({ onAddToCart }: MenuProps) {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {menuItems.map((item) => (
             <div
-              key={item._id}
+              key={item.id}
               className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
             >
               <div className="h-48 bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
@@ -159,10 +178,10 @@ export default function Menu({ onAddToCart }: MenuProps) {
                     {item.category === "starters"
                       ? "🥗"
                       : item.category === "veg"
-                      ? "🥬"
-                      : item.category === "non-veg"
-                      ? "🍖"
-                      : "🍰"}
+                        ? "🥬"
+                        : item.category === "non-veg"
+                          ? "🍖"
+                          : "🍰"}
                   </span>
                 )}
               </div>

@@ -1,19 +1,30 @@
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  menuService,
+  orderService,
+  reservationService,
+  MenuItem,
+  Order,
+  Reservation,
+} from "../services/firestoreService";
 import { toast } from "sonner";
-import { Id } from "../../convex/_generated/dataModel";
 
-export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"orders" | "reservations" | "menu">(
-    "orders"
-  );
+interface AdminDashboardProps {
+  userId?: string;
+  userRole: string;
+}
+
+export default function AdminDashboard({
+  userId,
+  userRole,
+}: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<
+    "orders" | "reservations" | "menu"
+  >("orders");
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <h1 className="text-4xl font-bold text-gray-900 mb-8">
-        Admin Dashboard
-      </h1>
+      <h1 className="text-4xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
 
       <div className="flex space-x-4 mb-8">
         <button
@@ -56,16 +67,42 @@ export default function AdminDashboard() {
 }
 
 function OrdersManagement() {
-  const orders = useQuery(api.orders.list, {});
-  const updateOrderStatus = useMutation(api.orders.updateStatus);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      try {
+        const allOrders = await orderService.getAll();
+        setOrders(allOrders);
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+        toast.error("Failed to load orders");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const handleStatusUpdate = async (
-    orderId: Id<"orders">,
-    status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled"
+    orderId: string,
+    status:
+      | "pending"
+      | "confirmed"
+      | "preparing"
+      | "ready"
+      | "completed"
+      | "cancelled",
   ) => {
     try {
-      await updateOrderStatus({ id: orderId, status });
+      await orderService.updateStatus(orderId, status);
       toast.success("Order status updated!");
+      // Refresh orders
+      const allOrders = await orderService.getAll();
+      setOrders(allOrders);
     } catch (error) {
       toast.error("Failed to update order status.");
       console.error(error);
@@ -94,7 +131,7 @@ function OrdersManagement() {
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         Orders Management
       </h2>
-      {orders === undefined ? (
+      {loading ? (
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
         </div>
@@ -103,22 +140,27 @@ function OrdersManagement() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <div key={order._id} className="border border-gray-200 rounded-lg p-4">
+            <div
+              key={order.id}
+              className="border border-gray-200 rounded-lg p-4"
+            >
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <h3 className="font-bold text-gray-900">
-                    Order #{order._id.slice(-6)}
+                    Order #{order.id?.slice(-6) || ""}
                   </h3>
                   <p className="text-sm text-gray-600">
                     {order.customerName} - {order.customerPhone}
                   </p>
                   <p className="text-sm text-gray-600">
-                    {new Date(order._creationTime).toLocaleString()}
+                    {order.createdAt
+                      ? new Date(order.createdAt.toMillis()).toLocaleString()
+                      : ""}
                   </p>
                 </div>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                    order.status
+                    order.status,
                   )}`}
                 >
                   {order.status}
@@ -126,10 +168,12 @@ function OrdersManagement() {
               </div>
 
               <div className="mb-3">
-                <p className="text-sm font-semibold text-gray-700 mb-1">Items:</p>
+                <p className="text-sm font-semibold text-gray-700 mb-1">
+                  Items:
+                </p>
                 {order.items.map((item, index) => (
                   <p key={index} className="text-sm text-gray-600">
-                    {item.menuItem?.name} × {item.quantity}
+                    {item.name} × {item.quantity}
                   </p>
                 ))}
               </div>
@@ -138,18 +182,22 @@ function OrdersManagement() {
                 <p className="font-bold text-orange-600">
                   ₹{order.totalAmount.toFixed(2)}
                 </p>
-                <select
-                  value={order.status}
-                  onChange={(e) => void handleStatusUpdate(order._id, e.target.value as any)}
-                  className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="preparing">Preparing</option>
-                  <option value="ready">Ready</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+                {order.id && (
+                  <select
+                    value={order.status}
+                    onChange={(e) =>
+                      void handleStatusUpdate(order.id!, e.target.value as any)
+                    }
+                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="preparing">Preparing</option>
+                    <option value="ready">Ready</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                )}
               </div>
             </div>
           ))}
@@ -160,16 +208,36 @@ function OrdersManagement() {
 }
 
 function ReservationsManagement() {
-  const reservations = useQuery(api.reservations.list, {});
-  const updateReservationStatus = useMutation(api.reservations.updateStatus);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReservations = async () => {
+      setLoading(true);
+      try {
+        const allReservations = await reservationService.getAll();
+        setReservations(allReservations);
+      } catch (err) {
+        console.error("Error fetching reservations:", err);
+        toast.error("Failed to load reservations");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReservations();
+  }, []);
 
   const handleStatusUpdate = async (
-    reservationId: Id<"reservations">,
-    status: "pending" | "confirmed" | "cancelled" | "completed"
+    reservationId: string,
+    status: "pending" | "confirmed" | "cancelled" | "completed",
   ) => {
     try {
-      await updateReservationStatus({ id: reservationId, status });
+      await reservationService.updateStatus(reservationId, status);
       toast.success("Reservation status updated!");
+      // Refresh reservations
+      const allReservations = await reservationService.getAll();
+      setReservations(allReservations);
     } catch (error) {
       toast.error("Failed to update reservation status.");
       console.error(error);
@@ -196,7 +264,7 @@ function ReservationsManagement() {
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         Reservations Management
       </h2>
-      {reservations === undefined ? (
+      {loading ? (
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
         </div>
@@ -206,7 +274,7 @@ function ReservationsManagement() {
         <div className="space-y-4">
           {reservations.map((reservation) => (
             <div
-              key={reservation._id}
+              key={reservation.id}
               className="border border-gray-200 rounded-lg p-4"
             >
               <div className="flex justify-between items-start mb-3">
@@ -231,7 +299,7 @@ function ReservationsManagement() {
                 </div>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                    reservation.status
+                    reservation.status,
                   )}`}
                 >
                   {reservation.status}
@@ -239,16 +307,23 @@ function ReservationsManagement() {
               </div>
 
               <div className="flex justify-end">
-                <select
-                  value={reservation.status}
-                  onChange={(e) => void handleStatusUpdate(reservation._id, e.target.value as any)}
-                  className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="completed">Completed</option>
-                </select>
+                {reservation.id && (
+                  <select
+                    value={reservation.status}
+                    onChange={(e) =>
+                      void handleStatusUpdate(
+                        reservation.id!,
+                        e.target.value as any,
+                      )
+                    }
+                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                )}
               </div>
             </div>
           ))}
@@ -259,14 +334,9 @@ function ReservationsManagement() {
 }
 
 function MenuManagement() {
-  const menuItems = useQuery(api.menuItems.list, {});
-  const createMenuItem = useMutation(api.menuItems.create);
-  const updateMenuItem = useMutation(api.menuItems.update);
-  const deleteMenuItem = useMutation(api.menuItems.remove);
-  const generateUploadUrl = useMutation(api.menuItems.generateUploadUrl);
-
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<Id<"menuItems"> | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -275,64 +345,43 @@ function MenuManagement() {
     preparationTime: 15,
     available: true,
   });
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleSeedData = async () => {
-    setIsSeeding(true);
-    try {
-      const convexUrl = import.meta.env.VITE_CONVEX_URL;
-      const response = await fetch(`${convexUrl}/api/seed`, { method: "POST" });
-      if (response.ok) {
-        toast.success("Menu items seeded successfully!");
-      } else {
-        toast.error("Failed to seed menu items.");
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      setLoading(true);
+      try {
+        const items = await menuService.getAll();
+        setMenuItems(items);
+      } catch (err) {
+        console.error("Error fetching menu items:", err);
+        toast.error("Failed to load menu items");
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      toast.error("Failed to seed menu items.");
-      console.error(error);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
+    };
+
+    fetchMenuItems();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      let imageId: Id<"_storage"> | undefined;
-
-      if (imageFile) {
-        const uploadUrl = await generateUploadUrl();
-        const result = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": imageFile.type },
-          body: imageFile,
-        });
-        const json = await result.json();
-        if (!result.ok) {
-          throw new Error(`Upload failed: ${JSON.stringify(json)}`);
-        }
-        imageId = json.storageId;
-      }
-
       if (editingId) {
-        await updateMenuItem({
-          id: editingId,
-          ...formData,
-          imageId,
-        });
+        await menuService.update(editingId, formData);
         toast.success("Menu item updated!");
         setEditingId(null);
       } else {
-        await createMenuItem({
-          ...formData,
-          imageId,
-        });
+        await menuService.create(formData);
         toast.success("Menu item created!");
       }
+
+      // Refresh menu items
+      const items = await menuService.getAll();
+      setMenuItems(items);
 
       setFormData({
         name: "",
@@ -342,7 +391,6 @@ function MenuManagement() {
         preparationTime: 15,
         available: true,
       });
-      setImageFile(null);
       setIsAdding(false);
     } catch (error) {
       toast.error("Failed to save menu item.");
@@ -352,8 +400,8 @@ function MenuManagement() {
     }
   };
 
-  const handleEdit = (item: any) => {
-    setEditingId(item._id);
+  const handleEdit = (item: MenuItem) => {
+    setEditingId(item.id || null);
     setFormData({
       name: item.name,
       description: item.description,
@@ -365,11 +413,14 @@ function MenuManagement() {
     setIsAdding(true);
   };
 
-  const handleDelete = async (id: Id<"menuItems">) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this item?")) {
       try {
-        await deleteMenuItem({ id });
+        await menuService.delete(id);
         toast.success("Menu item deleted!");
+        // Refresh menu items
+        const items = await menuService.getAll();
+        setMenuItems(items);
       } catch (error) {
         toast.error("Failed to delete menu item.");
         console.error(error);
@@ -381,17 +432,7 @@ function MenuManagement() {
     <div className="bg-white rounded-xl shadow-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Menu Management</h2>
-        <div className="flex space-x-2">
-          {menuItems?.length === 0 && (
-            <button
-              onClick={() => void handleSeedData()}
-              disabled={isSeeding}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
-            >
-              {isSeeding ? "Seeding..." : "Seed Sample Data"}
-            </button>
-          )}
-          <button
+        <button
           onClick={() => {
             setIsAdding(!isAdding);
             setEditingId(null);
@@ -408,7 +449,6 @@ function MenuManagement() {
         >
           {isAdding ? "Cancel" : "Add Item"}
         </button>
-        </div>
       </div>
 
       {isAdding && (
@@ -504,17 +544,6 @@ function MenuManagement() {
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Image
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-              />
-            </div>
             <div className="flex items-center">
               <label className="flex items-center space-x-2">
                 <input
@@ -539,13 +568,13 @@ function MenuManagement() {
             {isSubmitting
               ? "Saving..."
               : editingId
-              ? "Update Item"
-              : "Add Item"}
+                ? "Update Item"
+                : "Add Item"}
           </button>
         </form>
       )}
 
-      {menuItems === undefined ? (
+      {loading ? (
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
         </div>
@@ -556,7 +585,10 @@ function MenuManagement() {
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {menuItems.map((item) => (
-            <div key={item._id} className="border border-gray-200 rounded-lg p-4">
+            <div
+              key={item.id}
+              className="border border-gray-200 rounded-lg p-4"
+            >
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <h3 className="font-bold text-gray-900">{item.name}</h3>
@@ -589,7 +621,7 @@ function MenuManagement() {
                     Edit
                   </button>
                   <button
-                    onClick={() => void handleDelete(item._id)}
+                    onClick={() => item.id && void handleDelete(item.id)}
                     className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm"
                   >
                     Delete

@@ -1,34 +1,41 @@
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { useState } from "react";
-import { Id } from "../../convex/_generated/dataModel";
+import { orderService } from "../services/firestoreService";
 import { toast } from "sonner";
+import UPIPayment from "../components/UPIPayment";
+
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
 
 interface CartProps {
-  cart: Array<{ id: string; name: string; price: number; quantity: number }>;
+  cart: CartItem[];
   onUpdateQuantity: (id: string, quantity: number) => void;
-  onClearCart: () => void;
-  onNavigate: (page: "home" | "menu" | "cart" | "reservations" | "orders" | "admin") => void;
+  clearCart: () => void;
+  onOrderComplete: () => void;
+  userId?: string;
 }
 
 export default function Cart({
   cart,
   onUpdateQuantity,
-  onClearCart,
-  onNavigate,
+  clearCart,
+  onOrderComplete,
+  userId,
 }: CartProps) {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const createOrder = useMutation(api.orders.create);
-  const loggedInUser = useQuery(api.auth.loggedInUser);
+  const [showPayment, setShowPayment] = useState(false);
+  const [orderId, setOrderId] = useState<string | undefined>();
 
   const totalAmount = cart.reduce(
     (sum, item) => sum + item.price * item.quantity,
-    0
+    0,
   );
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -47,35 +54,53 @@ export default function Cart({
     setIsSubmitting(true);
 
     try {
-      await createOrder({
+      // Create order with pending status
+      const createdOrder = await orderService.create({
+        userId,
         customerName,
         customerEmail: customerEmail || undefined,
         customerPhone,
         items: cart.map((item) => ({
-          menuItemId: item.id as Id<"menuItems">,
+          menuItemId: item.id,
+          name: item.name,
           quantity: item.quantity,
           price: item.price,
         })),
         totalAmount,
         specialInstructions: specialInstructions || undefined,
+        status: "pending",
       });
 
-      toast.success("Order placed successfully!");
-      onClearCart();
-      setCustomerName("");
-      setCustomerEmail("");
-      setCustomerPhone("");
-      setSpecialInstructions("");
-      onNavigate("orders");
+      // Set the order ID and show payment component
+      setOrderId(createdOrder);
+      setShowPayment(true);
+      toast.success("Order created! Proceed with payment.");
     } catch (error) {
-      toast.error("Failed to place order. Please try again.");
+      toast.error("Failed to create order. Please try again.");
       console.error(error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (cart.length === 0) {
+  const handlePaymentSuccess = () => {
+    toast.success("Payment confirmed! Order completed.");
+    clearCart();
+    setCustomerName("");
+    setCustomerEmail("");
+    setCustomerPhone("");
+    setSpecialInstructions("");
+    setShowPayment(false);
+    setOrderId(undefined);
+    onOrderComplete();
+  };
+
+  const handlePaymentFailed = () => {
+    toast.error("Payment failed. Please try again.");
+    // Keep the order data for retry
+  };
+
+  if (cart.length === 0 && !showPayment) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center py-20">
@@ -86,13 +111,33 @@ export default function Cart({
           <p className="text-lg text-gray-600 mb-8">
             Add some delicious items from our menu!
           </p>
-          <button
-            onClick={() => onNavigate("menu")}
-            className="px-8 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
-          >
+          <button className="px-8 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium">
             Browse Menu
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // Show payment component if payment flow is active
+  if (showPayment && orderId) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="mb-8">
+          <button
+            onClick={() => setShowPayment(false)}
+            className="text-orange-600 hover:text-orange-700 font-medium flex items-center gap-2"
+          >
+            ← Back to Order
+          </button>
+        </div>
+        <UPIPayment
+          totalAmount={totalAmount}
+          orderId={orderId}
+          customerName={customerName}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentFailed={handlePaymentFailed}
+        />
       </div>
     );
   }
@@ -151,7 +196,7 @@ export default function Cart({
               ))}
             </div>
             <button
-              onClick={onClearCart}
+              onClick={clearCart}
               className="mt-6 text-red-600 hover:text-red-700 font-medium"
             >
               Clear Cart
@@ -173,7 +218,7 @@ export default function Cart({
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder={loggedInUser?.name || "Your name"}
+                  placeholder="Your name"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                   required
                 />
@@ -186,7 +231,7 @@ export default function Cart({
                   type="email"
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder={loggedInUser?.email || "your@email.com"}
+                  placeholder="your@email.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 />
               </div>
@@ -228,7 +273,7 @@ export default function Cart({
                   disabled={isSubmitting}
                   className="w-full px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? "Placing Order..." : "Place Order"}
+                  {isSubmitting ? "Creating Order..." : "Proceed to Payment"}
                 </button>
               </div>
             </form>

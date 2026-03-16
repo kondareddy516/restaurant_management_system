@@ -1,21 +1,23 @@
-"use client";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth } from "convex/react";
+import { auth } from "./config/firebase";
+import { signOut } from "firebase/auth";
+import { toast } from "sonner";
 
-export function SignOutButton() {
-  const { isAuthenticated } = useConvexAuth();
-  const { signOut } = useAuthActions();
-
-  if (!isAuthenticated) {
-    return null;
-  }
+export default function SignOutButton() {
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Signed out successfully!");
+    } catch (error) {
+      toast.error("Failed to sign out");
+    }
+  };
 
   return (
     <button
-      className="px-4 py-2 rounded bg-white text-secondary border border-gray-200 font-semibold hover:bg-gray-50 hover:text-secondary-hover transition-colors shadow-sm hover:shadow"
-      onClick={() => void signOut()}
+      onClick={handleSignOut}
+      className="px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-lg hover:from-red-700 hover:to-orange-700 transition border-2 border-red-700"
     >
-      Sign out
+      Sign Out
     </button>
   );
 }

@@ -11,7 +11,7 @@ import {
   signOut as firebaseSignOut,
   Auth,
 } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth } from "../config/firebase";
 
 interface AuthContextType {
   user: any;
@@ -28,6 +28,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  // Validate Firebase initialization
+  if (!auth) {
+    console.error("[Auth] Firebase auth instance is not initialized");
+  } else {
+    console.log("[Auth] Firebase authentication initialized successfully");
+  }
+
   const [user, loading, error] = useAuthState(auth);
 
   const signUp = async (email: string, password: string) => {

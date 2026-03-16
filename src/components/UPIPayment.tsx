@@ -207,32 +207,33 @@ const UPIPayment: React.FC<UPIPaymentProps> = ({
 
         {/* Payment Method Selection */}
         <div className="space-y-4">
-          {/* Mobile Flow Button */}
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleOpenUPIApps}
-            className="w-full py-4 rounded-lg font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 text-lg"
-            style={{
-              backgroundColor: "#B87333", // Burnished Copper
-              boxShadow: "0 8px 24px rgba(184, 115, 51, 0.4)",
-            }}
-          >
-            <span className="text-2xl">📱</span>
-            {isMobile ? "OPEN UPI APPS" : "SCAN QR CODE"}
-          </motion.button>
+          {/* Mobile Flow Button - UPI App Direct Open */}
+          {isMobile && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleOpenUPIApps}
+              className="w-full py-4 rounded-lg font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 text-lg"
+              style={{
+                backgroundColor: "#B87333", // Burnished Copper
+                boxShadow: "0 8px 24px rgba(184, 115, 51, 0.4)",
+              }}
+            >
+              <span className="text-2xl">📱</span>
+              OPEN UPI APPS
+            </motion.button>
+          )}
 
-          {/* Desktop QR Code Option */}
+          {/* Desktop QR Code Option - Never show UPI app button on desktop */}
           {!isMobile && (
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setPaymentStep("upi_flow")}
-              className="w-full py-4 rounded-lg font-bold transition-all duration-300 flex items-center justify-center gap-3 text-lg"
+              className="w-full py-4 rounded-lg font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 text-lg"
               style={{
-                backgroundColor: "#FFD700",
-                color: "#2D0B0B",
-                border: "2px solid #B87333",
+                backgroundColor: "#B87333", // Burnished Copper
+                boxShadow: "0 8px 24px rgba(184, 115, 51, 0.4)",
               }}
             >
               <span className="text-2xl">📲</span>

@@ -7,7 +7,12 @@
  */
 
 import { initializeApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import {
+  getAuth,
+  connectAuthEmulator,
+  browserSessionPersistence,
+  setPersistence,
+} from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
@@ -31,6 +36,19 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-TLW35VD3PV",
 };
 
+// Log Firebase API Key source (environment or hardcoded)
+const apiKeySource = import.meta.env.VITE_FIREBASE_API_KEY
+  ? "environment"
+  : "hardcoded";
+console.log(`[Firebase] Initialized with API Key from ${apiKeySource} source`);
+
+// Validate Firebase configuration
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error(
+    "[Firebase] Invalid configuration: Missing API Key or Project ID",
+  );
+}
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -38,6 +56,16 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Set session persistence for authentication
+try {
+  setPersistence(auth, browserSessionPersistence).catch((error) => {
+    console.warn("[Firebase] Failed to set session persistence:", error);
+    // App will still work with default persistence
+  });
+} catch (error) {
+  console.warn("[Firebase] Error setting persistence:", error);
+}
 
 // Enable emulators in development (optional, uncomment if needed)
 // const isDev = import.meta.env.DEV;

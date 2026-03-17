@@ -27,9 +27,21 @@ const VALID_PAGES: Page[] = [
   "admin",
 ];
 
+const AUTH_REQUIRED_PAGES: Page[] = [
+  "menu",
+  "cart",
+  "reservations",
+  "orders",
+  "admin",
+];
+
 function getPageFromHash(hash: string): Page {
   const page = hash.replace(/^#/, "") as Page;
   return VALID_PAGES.includes(page) ? page : "home";
+}
+
+function requiresAuth(page: Page): boolean {
+  return AUTH_REQUIRED_PAGES.includes(page);
 }
 
 export interface CartItem {
@@ -52,7 +64,19 @@ export default function App() {
   const { user, loading } = useAuth();
   const [_roleLoading, setRoleLoading] = useState(false);
 
+  const showAuthRequiredMessage = () => {
+    toast.error(
+      "Please sign in to view the menu, reserve a table, or order food.",
+    );
+  };
+
   const navigateToPage = (page: Page) => {
+    if (!user && requiresAuth(page)) {
+      setCurrentPage("home");
+      showAuthRequiredMessage();
+      return;
+    }
+
     setCurrentPage(page);
   };
 
@@ -76,6 +100,13 @@ export default function App() {
       window.history.replaceState(null, "", nextHash);
     }
   }, [currentPage]);
+
+  useEffect(() => {
+    if (!user && requiresAuth(currentPage)) {
+      setCurrentPage("home");
+      window.history.replaceState(null, "", "#home");
+    }
+  }, [currentPage, user]);
 
   // Fetch user role whenever user changes
   useEffect(() => {
@@ -175,7 +206,14 @@ export default function App() {
   const renderPage = () => {
     switch (currentPage) {
       case "home":
-        return <Home addToCart={addToCart} onNavigate={navigateToPage} />;
+        return (
+          <Home
+            addToCart={addToCart}
+            onNavigate={navigateToPage}
+            isAuthenticated={!!user}
+            onRequireSignIn={showAuthRequiredMessage}
+          />
+        );
       case "menu":
         return <Menu addToCart={addToCart} />;
       case "cart":
@@ -198,7 +236,14 @@ export default function App() {
       case "admin":
         return <AdminDashboard userId={user?.uid} userRole={userRole} />;
       default:
-        return <Home addToCart={addToCart} onNavigate={navigateToPage} />;
+        return (
+          <Home
+            addToCart={addToCart}
+            onNavigate={navigateToPage}
+            isAuthenticated={!!user}
+            onRequireSignIn={showAuthRequiredMessage}
+          />
+        );
     }
   };
 
@@ -234,8 +279,12 @@ export default function App() {
             <nav className="hidden md:flex items-center space-x-1">
               {[
                 { id: "home" as Page, label: "Home" },
-                { id: "menu" as Page, label: "Menu" },
-                { id: "reservations" as Page, label: "Reservations" },
+                ...(user
+                  ? [
+                      { id: "menu" as Page, label: "Menu" },
+                      { id: "reservations" as Page, label: "Reservations" },
+                    ]
+                  : []),
               ].map((link) => (
                 <button
                   key={link.id}
@@ -283,17 +332,19 @@ export default function App() {
             {/* Right Side - Cart & Auth */}
             <div className="flex items-center space-x-4">
               {/* Cart Icon */}
-              <button
-                onClick={() => navigateToPage("cart")}
-                className="relative flex items-center space-x-2 px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 transition-all"
-              >
-                <span className="text-xl">🛒</span>
-                {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
-                    {cart.length}
-                  </span>
-                )}
-              </button>
+              {user ? (
+                <button
+                  onClick={() => navigateToPage("cart")}
+                  className="relative flex items-center space-x-2 px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 transition-all"
+                >
+                  <span className="text-xl">🛒</span>
+                  {cart.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                      {cart.length}
+                    </span>
+                  )}
+                </button>
+              ) : null}
 
               {/* User Info & Auth Buttons */}
               <div className="flex items-center space-x-3">

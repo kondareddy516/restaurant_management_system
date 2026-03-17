@@ -1,9 +1,54 @@
 interface HomeProps {
   addToCart: (item: { id: string; name: string; price: number }) => void;
   onNavigate: (page: "menu" | "reservations" | "cart") => void;
+  isAuthenticated: boolean;
+  onRequireSignIn: () => void;
 }
 
-export default function Home({ addToCart: _addToCart, onNavigate }: HomeProps) {
+function AccessButton({
+  label,
+  onClick,
+  isAuthenticated,
+  primary = false,
+}: {
+  label: string;
+  onClick: () => void;
+  isAuthenticated: boolean;
+  primary?: boolean;
+}) {
+  const baseClassName = primary
+    ? "px-8 py-4 rounded-lg transition-colors font-semibold text-lg shadow-lg"
+    : "px-8 py-4 rounded-lg transition-colors font-semibold text-lg border-2";
+
+  const stateClassName = isAuthenticated
+    ? primary
+      ? "bg-white text-orange-600 hover:bg-gray-100"
+      : "bg-transparent border-white text-white hover:bg-white hover:text-orange-600"
+    : primary
+      ? "bg-white/70 text-orange-400 cursor-not-allowed"
+      : "bg-white/10 border-white/50 text-white/70 cursor-not-allowed";
+
+  return (
+    <button onClick={onClick} className={`${baseClassName} ${stateClassName}`}>
+      {label}
+    </button>
+  );
+}
+
+export default function Home({
+  addToCart: _addToCart,
+  onNavigate,
+  isAuthenticated,
+  onRequireSignIn,
+}: HomeProps) {
+  const handleProtectedAction = (page: "menu" | "reservations" | "cart") => {
+    if (!isAuthenticated) {
+      onRequireSignIn();
+      return;
+    }
+
+    onNavigate(page);
+  };
 
 
   return (
@@ -19,16 +64,28 @@ export default function Home({ addToCart: _addToCart, onNavigate }: HomeProps) {
             <p className="text-xl lg:text-2xl mb-8 max-w-3xl mx-auto">
               Deliciously Crafted Meals, Served with Love
             </p>
+            {!isAuthenticated ? (
+              <p className="text-base lg:text-lg mb-6 max-w-2xl mx-auto text-orange-100">
+                Sign in to view the menu, reserve a table, and place orders.
+              </p>
+            ) : null}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-white text-orange-600 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg shadow-lg">
-                🍽️ Order Now
-              </button>
-              <button onClick={() => onNavigate("reservations")} className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
-                📅 Book a Table
-              </button>
-              <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
-                📖 View Menu
-              </button>
+              <AccessButton
+                label="🍽️ Order Now"
+                onClick={() => handleProtectedAction("menu")}
+                isAuthenticated={isAuthenticated}
+                primary
+              />
+              <AccessButton
+                label="📅 Book a Table"
+                onClick={() => handleProtectedAction("reservations")}
+                isAuthenticated={isAuthenticated}
+              />
+              <AccessButton
+                label="📖 View Menu"
+                onClick={() => handleProtectedAction("menu")}
+                isAuthenticated={isAuthenticated}
+              />
             </div>
           </div>
         </div>
@@ -94,7 +151,14 @@ export default function Home({ addToCart: _addToCart, onNavigate }: HomeProps) {
           </div>
 
           <div className="text-center">
-            <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold text-lg">
+            <button
+              onClick={() => handleProtectedAction("menu")}
+              className={`px-8 py-4 rounded-lg transition-colors font-semibold text-lg ${
+                isAuthenticated
+                  ? "bg-orange-600 text-white hover:bg-orange-700"
+                  : "bg-orange-200 text-orange-500 cursor-not-allowed"
+              }`}
+            >
               View Full Menu
             </button>
           </div>
@@ -176,12 +240,17 @@ export default function Home({ addToCart: _addToCart, onNavigate }: HomeProps) {
             we're here to serve you the best culinary experience.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onClick={() => onNavigate("reservations")} className="px-8 py-4 bg-white text-orange-600 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg">
-              📅 Book a Table
-            </button>
-            <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
-              🛒 Order Now
-            </button>
+            <AccessButton
+              label="📅 Book a Table"
+              onClick={() => handleProtectedAction("reservations")}
+              isAuthenticated={isAuthenticated}
+              primary
+            />
+            <AccessButton
+              label="🛒 Order Now"
+              onClick={() => handleProtectedAction("menu")}
+              isAuthenticated={isAuthenticated}
+            />
           </div>
         </div>
       </section>

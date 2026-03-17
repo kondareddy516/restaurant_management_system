@@ -2,25 +2,58 @@ import { useEffect, useState } from "react";
 import { orderService, Order } from "../services/firestoreService";
 import { toast } from "sonner";
 import ErrorBoundaryComponent from "../components/ErrorBoundaryComponent";
+import { useAuth } from "../context/AuthContext";
 
 interface OrdersProps {
-  userId?: string;
   userRole: string;
 }
 
-export default function Orders({ userId, userRole }: OrdersProps) {
+function CopperSpinner({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20">
+      <div
+        className="animate-spin rounded-full h-12 w-12 border-4 border-solid"
+        style={{
+          borderColor: "rgba(184, 115, 51, 0.25)",
+          borderTopColor: "#B87333",
+        }}
+      ></div>
+      <p className="mt-4 font-medium" style={{ color: "#B87333" }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function getOrderTimestamp(order: Order) {
+  return order.createdAt ?? order.updatedAt;
+}
+
+export default function Orders({ userRole }: OrdersProps) {
+  const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch orders when component mounts or userId/userRole changes
+  // Fetch orders when auth state resolves and the current user is available
   useEffect(() => {
     const fetchOrders = async () => {
+      if (authLoading) {
+        return;
+      }
+
+      if (!user?.uid) {
+        setOrders([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
         const fetchedOrders = await orderService.getAll(
-          userId,
+          user.uid,
           undefined,
           userRole,
         );
@@ -57,7 +90,7 @@ export default function Orders({ userId, userRole }: OrdersProps) {
     };
 
     fetchOrders();
-  }, [userId, userRole]);
+  }, [authLoading, user, userRole]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -81,9 +114,18 @@ export default function Orders({ userId, userRole }: OrdersProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-8">My Orders</h1>
 
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+        {authLoading ? (
+          <CopperSpinner label="Authenticating your Royal account..." />
+        ) : loading ? (
+          <CopperSpinner label="Loading your orders..." />
+        ) : !user?.uid ? (
+          <div className="text-center py-20">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Sign in to view your orders
+            </h2>
+            <p className="text-gray-600">
+              Your order history will appear once your Royal account is authenticated.
+            </p>
           </div>
         ) : error ? (
           <div
@@ -196,9 +238,9 @@ export default function Orders({ userId, userRole }: OrdersProps) {
                       Order #{order.id?.slice(-6) || ""}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      {order.createdAt
-                        ? new Date(order.createdAt.toMillis()).toLocaleString()
-                        : ""}
+                      {getOrderTimestamp(order)
+                        ? new Date(getOrderTimestamp(order)!.toMillis()).toLocaleString()
+                        : "Legacy order"}
                     </p>
                   </div>
                   <span

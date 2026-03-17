@@ -20,6 +20,7 @@ import {
   Timestamp,
   doc,
   setDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
@@ -99,6 +100,20 @@ export interface User {
   createdAt?: Timestamp;
 }
 
+export interface UserCartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface UserCart {
+  userId: string;
+  items: UserCartItem[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 /**
  * Generic helper functions
  */
@@ -128,6 +143,91 @@ async function getQueryResults<T>(q: Query): Promise<T[]> {
     }
     throw error;
   }
+}
+
+function getDocumentTimestampMillis(document: {
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}): number {
+  return (
+    document.createdAt?.toMillis?.() ??
+    document.updatedAt?.toMillis?.() ??
+    0
+  );
+}
+
+function sortDocumentsByTimestampDesc<T extends {
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}>(documents: T[]): T[] {
+  return [...documents].sort(
+    (firstDocument, secondDocument) =>
+      getDocumentTimestampMillis(secondDocument) -
+      getDocumentTimestampMillis(firstDocument),
+  );
+}
+
+async function getUserScopedResultsWithLegacyFallback<
+  T extends { id?: string; createdAt?: Timestamp; updatedAt?: Timestamp },
+>(
+  collectionName: "orders" | "reservations",
+  constraints: QueryConstraint[],
+  userId: string,
+): Promise<T[]> {
+  try {
+    const collectionRef = collection(db, collectionName);
+    const orderedSnapshot = await getDocs(
+      query(collectionRef, ...constraints, orderBy("createdAt", "desc")),
+    );
+    const fallbackSnapshot = await getDocs(query(collectionRef, ...constraints));
+
+    if (fallbackSnapshot.empty) {
+      console.log("No documents found for user:", userId);
+    }
+
+    const mergedDocuments = new Map<string, T>();
+
+    orderedSnapshot.docs.forEach((snapshotDocument) => {
+      mergedDocuments.set(snapshotDocument.id, {
+        id: snapshotDocument.id,
+        ...snapshotDocument.data(),
+      } as T);
+    });
+
+    fallbackSnapshot.docs.forEach((snapshotDocument) => {
+      if (!mergedDocuments.has(snapshotDocument.id)) {
+        mergedDocuments.set(snapshotDocument.id, {
+          id: snapshotDocument.id,
+          ...snapshotDocument.data(),
+        } as T);
+      }
+    });
+
+    return sortDocumentsByTimestampDesc(Array.from(mergedDocuments.values()));
+  } catch (error: any) {
+    if (
+      error?.code === "failed-precondition" ||
+      error?.message?.includes("index") ||
+      error?.message?.includes("composite")
+    ) {
+      const indexError = new Error(
+        "The Royal Archives are being indexed. Please refresh in a few moments.",
+      );
+      (indexError as any).code = "failed-precondition";
+      throw indexError;
+    }
+
+    throw error;
+  }
+}
+
+function sanitizeCartItems(items: UserCartItem[]): UserCartItem[] {
+  return items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+  }));
 }
 
 /**
@@ -204,7 +304,7 @@ export const orderService = {
     status?: string,
     userRole?: string,
   ): Promise<Order[]> {
-    let constraints: QueryConstraint[] = [];
+    const constraints: QueryConstraint[] = [];
 
     // If customer, only return their orders
     if (userRole === "customer" && userId) {
@@ -216,9 +316,19 @@ export const orderService = {
       constraints.push(where("status", "==", status));
     }
 
-    constraints.push(orderBy("createdAt", "desc"));
+    if (userRole === "customer" && userId) {
+      return getUserScopedResultsWithLegacyFallback<Order>(
+        "orders",
+        constraints,
+        userId,
+      );
+    }
 
-    const q = query(collection(db, "orders"), ...constraints);
+    const q = query(
+      collection(db, "orders"),
+      ...constraints,
+      orderBy("createdAt", "desc"),
+    );
     return getQueryResults<Order>(q);
   },
 
@@ -292,7 +402,7 @@ export const reservationService = {
     status?: string,
     userRole?: string,
   ): Promise<Reservation[]> {
-    let constraints: QueryConstraint[] = [];
+    const constraints: QueryConstraint[] = [];
 
     // If customer, only return their reservations
     if (userRole === "customer" && userId) {
@@ -309,9 +419,19 @@ export const reservationService = {
       constraints.push(where("status", "==", status));
     }
 
-    constraints.push(orderBy("createdAt", "desc"));
+    if (userRole === "customer" && userId) {
+      return getUserScopedResultsWithLegacyFallback<Reservation>(
+        "reservations",
+        constraints,
+        userId,
+      );
+    }
 
-    const q = query(collection(db, "reservations"), ...constraints);
+    const q = query(
+      collection(db, "reservations"),
+      ...constraints,
+      orderBy("createdAt", "desc"),
+    );
     return getQueryResults<Reservation>(q);
   },
 
@@ -461,5 +581,47 @@ export const userService = {
   async deleteUser(uid: string): Promise<void> {
     const docRef = doc(db, "users", uid);
     await deleteDoc(docRef);
+  },
+};
+
+export const userCartService = {
+  subscribe(
+    userId: string,
+    onCartChange: (items: UserCartItem[]) => void,
+    onError?: (error: Error) => void,
+  ) {
+    const cartRef = doc(db, "userCarts", userId);
+
+    return onSnapshot(
+      cartRef,
+      (documentSnapshot) => {
+        const data = documentSnapshot.data() as UserCart | undefined;
+        onCartChange(Array.isArray(data?.items) ? data.items : []);
+      },
+      (error) => {
+        onError?.(error);
+      },
+    );
+  },
+
+  async setCart(userId: string, items: UserCartItem[]): Promise<void> {
+    const cartRef = doc(db, "userCarts", userId);
+    const existingCart = await getDoc(cartRef);
+    const now = Timestamp.now();
+
+    await setDoc(
+      cartRef,
+      {
+        userId,
+        items: sanitizeCartItems(items),
+        updatedAt: now,
+        ...(existingCart.exists() ? {} : { createdAt: now }),
+      },
+      { merge: true },
+    );
+  },
+
+  async clear(userId: string): Promise<void> {
+    await this.setCart(userId, []);
   },
 };

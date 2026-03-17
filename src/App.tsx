@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "./config/firebase";
 import { Toaster } from "sonner";
 import { toast } from "sonner";
 
@@ -15,7 +13,8 @@ import SignInForm from "./SignInForm";
 import SignOutButton from "./SignOutButton";
 
 // Services
-import { userRoleService } from "./services/firestoreService";
+import { userCartService, userRoleService } from "./services/firestoreService";
+import { useAuth } from "./context/AuthContext";
 
 type Page = "home" | "menu" | "cart" | "reservations" | "orders" | "admin";
 
@@ -30,7 +29,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [userRole, setUserRole] = useState<string>("customer");
-  const [user, loading] = useAuthState(auth);
+  const { user, loading } = useAuth();
   const [_roleLoading, setRoleLoading] = useState(false);
 
   // Fetch user role whenever user changes
@@ -52,32 +51,79 @@ export default function App() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user?.uid) {
+      setCart([]);
+      return;
+    }
+
+    const unsubscribe = userCartService.subscribe(
+      user.uid,
+      (items) => {
+        setCart(items);
+      },
+      (error) => {
+        console.error("Error syncing cart:", error);
+        toast.error("Failed to sync Royal Cart");
+      },
+    );
+
+    return unsubscribe;
+  }, [user?.uid]);
+
   // Cart management functions
   const addToCart = (item: { id: string; name: string; price: number }) => {
     setCart((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
-        );
+      const existing = prev.find((cartItem) => cartItem.id === item.id);
+      const nextCart = existing
+        ? prev.map((cartItem) =>
+            cartItem.id === item.id
+              ? { ...cartItem, quantity: cartItem.quantity + 1 }
+              : cartItem,
+          )
+        : [...prev, { ...item, quantity: 1 }];
+
+      if (user?.uid) {
+        void userCartService.setCart(user.uid, nextCart).catch((error) => {
+          console.error("Error persisting cart item:", error);
+          toast.error("Failed to update Royal Cart");
+        });
       }
-      return [...prev, { ...item, quantity: 1 }];
+
+      return nextCart;
     });
     toast.success(`Added ${item.name} to cart`);
   };
 
   const updateCartQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      setCart((prev) => prev.filter((i) => i.id !== id));
-    } else {
-      setCart((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, quantity } : i)),
-      );
-    }
+    setCart((prev) => {
+      const nextCart =
+        quantity <= 0
+          ? prev.filter((item) => item.id !== id)
+          : prev.map((item) =>
+              item.id === id ? { ...item, quantity } : item,
+            );
+
+      if (user?.uid) {
+        void userCartService.setCart(user.uid, nextCart).catch((error) => {
+          console.error("Error updating cart quantity:", error);
+          toast.error("Failed to update Royal Cart");
+        });
+      }
+
+      return nextCart;
+    });
   };
 
   const clearCart = () => {
     setCart([]);
+
+    if (user?.uid) {
+      void userCartService.clear(user.uid).catch((error) => {
+        console.error("Error clearing cart:", error);
+        toast.error("Failed to clear Royal Cart");
+      });
+    }
   };
 
   // Page rendering
@@ -101,9 +147,9 @@ export default function App() {
           />
         );
       case "reservations":
-        return <Reservations userId={user?.uid} />;
+        return <Reservations />;
       case "orders":
-        return <Orders userId={user?.uid} userRole={userRole} />;
+        return <Orders userRole={userRole} />;
       case "admin":
         return <AdminDashboard userId={user?.uid} userRole={userRole} />;
       default:

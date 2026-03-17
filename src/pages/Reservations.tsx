@@ -2,12 +2,27 @@ import { useEffect, useState } from "react";
 import { reservationService, Reservation } from "../services/firestoreService";
 import { toast } from "sonner";
 import ErrorBoundaryComponent from "../components/ErrorBoundaryComponent";
+import { useAuth } from "../context/AuthContext";
 
-interface ReservationsProps {
-  userId?: string;
+function CopperSpinner({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12">
+      <div
+        className="animate-spin rounded-full h-10 w-10 border-4 border-solid"
+        style={{
+          borderColor: "rgba(184, 115, 51, 0.25)",
+          borderTopColor: "#B87333",
+        }}
+      ></div>
+      <p className="mt-4 font-medium" style={{ color: "#B87333" }}>
+        {label}
+      </p>
+    </div>
+  );
 }
 
-export default function Reservations({ userId }: ReservationsProps) {
+export default function Reservations() {
+  const { user, loading: authLoading } = useAuth();
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -24,12 +39,22 @@ export default function Reservations({ userId }: ReservationsProps) {
   // Fetch user's reservations
   useEffect(() => {
     const fetchReservations = async () => {
-      if (!userId) return;
+      if (authLoading) {
+        return;
+      }
+
+      if (!user?.uid) {
+        setMyReservations([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
         const reservations = await reservationService.getAll(
-          userId,
+          user.uid,
           undefined,
           undefined,
           "customer",
@@ -55,10 +80,15 @@ export default function Reservations({ userId }: ReservationsProps) {
     };
 
     fetchReservations();
-  }, [userId]);
+  }, [authLoading, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user?.uid) {
+      toast.error("Please sign in to make a reservation.");
+      return;
+    }
 
     if (!customerName || !customerPhone || !date || !time) {
       toast.error("Please fill in all required fields!", {
@@ -76,7 +106,7 @@ export default function Reservations({ userId }: ReservationsProps) {
     try {
       // Ensure NO undefined values - all fields have fallbacks
       await reservationService.create({
-        userId: userId || "",
+        userId: user.uid,
         customerName: customerName || "",
         customerEmail: customerEmail || "",
         customerPhone: customerPhone || "",
@@ -103,9 +133,9 @@ export default function Reservations({ userId }: ReservationsProps) {
       setSpecialRequests("");
 
       // Refresh reservations list
-      if (userId) {
+      if (user.uid) {
         const updated = await reservationService.getAll(
-          userId,
+          user.uid,
           undefined,
           undefined,
           "customer",
@@ -131,9 +161,9 @@ export default function Reservations({ userId }: ReservationsProps) {
       await reservationService.cancel(id);
       toast.success("Reservation cancelled successfully!");
       // Refresh reservations list
-      if (userId) {
+      if (user?.uid) {
         const updated = await reservationService.getAll(
-          userId,
+          user.uid,
           undefined,
           undefined,
           "customer",
@@ -168,11 +198,27 @@ export default function Reservations({ userId }: ReservationsProps) {
           Table Reservations
         </h1>
 
+        {authLoading ? (
+          <CopperSpinner label="Authenticating your Royal account..." />
+        ) : null}
+
         <div className="grid lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-xl shadow-lg p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
               Make a Reservation
             </h2>
+            {!user?.uid && !authLoading ? (
+              <div
+                className="mb-6 rounded-lg border px-4 py-3"
+                style={{
+                  borderColor: "#B87333",
+                  backgroundColor: "#FFF7F0",
+                  color: "#8C4A1F",
+                }}
+              >
+                Sign in to create and sync reservations with your account.
+              </div>
+            ) : null}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -267,7 +313,7 @@ export default function Reservations({ userId }: ReservationsProps) {
               </div>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || authLoading || !user?.uid}
                 className="w-full px-6 py-3 text-white rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: isSubmitting ? "#B87333" : "#E67E22",
@@ -295,10 +341,14 @@ export default function Reservations({ userId }: ReservationsProps) {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
               My Reservations
             </h2>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-              </div>
+            {authLoading ? (
+              <CopperSpinner label="Authenticating your Royal account..." />
+            ) : loading ? (
+              <CopperSpinner label="Loading your reservations..." />
+            ) : !user?.uid ? (
+              <p className="text-gray-600 text-center py-8">
+                Sign in to view your reservation history.
+              </p>
             ) : error ? (
               <div
                 style={{

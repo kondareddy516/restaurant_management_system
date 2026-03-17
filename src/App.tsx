@@ -31,7 +31,7 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [userRole, setUserRole] = useState<string>("customer");
   const [user, loading] = useAuthState(auth);
-  const [roleLoading, setRoleLoading] = useState(false);
+  const [_roleLoading, setRoleLoading] = useState(false);
 
   // Fetch user role whenever user changes
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function App() {
   const renderPage = () => {
     switch (currentPage) {
       case "home":
-        return <Home addToCart={addToCart} />;
+        return <Home addToCart={addToCart} onNavigate={setCurrentPage} />;
       case "menu":
         return <Menu addToCart={addToCart} />;
       case "cart":
@@ -107,7 +107,7 @@ export default function App() {
       case "admin":
         return <AdminDashboard userId={user?.uid} userRole={userRole} />;
       default:
-        return <Home addToCart={addToCart} />;
+        return <Home addToCart={addToCart} onNavigate={setCurrentPage} />;
     }
   };
 
@@ -258,19 +258,20 @@ export default function App() {
                 <li>Terms & Conditions</li>
               </ul>
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-amber-200 mb-4">Contact</h3>
-              <p className="text-amber-100 text-sm">
-                Email: info@restauranthub.com
-                <br />
-                Phone: 1-800-ROYAL-01
-              </p>
+           <div>
+              <h4 className="text-lg font-bold text-amber-200 mb-4">Contact</h4>
+              <ul className="space-y-2 text-amber-100">
+                <li>+91 6300522709</li>
+                <li>info@restauranthub.com</li>
+                <li>123 brodipet Street</li>
+                <li>Food District, guntur 12345</li>
+              </ul>
             </div>
           </div>
           <div className="border-t border-amber-700 mt-8 pt-8 text-center text-amber-300 text-sm">
             <p>
-              &copy; 2024 RestaurantHub. All rights reserved. Powered by
-              Firebase.
+              &copy; 2026 RestaurantHub. All rights reserved. Powered by
+            konda reddy.
             </p>
           </div>
         </div>

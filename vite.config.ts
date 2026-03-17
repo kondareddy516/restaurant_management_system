@@ -41,4 +41,29 @@ window.addEventListener('message', async (message) => {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Dev server config (local development only)
+  server: {
+    host: true,
+    port: 5173,
+  },
+  // Preview server config — used by Render via `npm run preview`
+  // Render injects the PORT env variable; binding to 0.0.0.0 is required
+  // so Render's port-scan health check can reach the process.
+  //
+  // RENDER DEPLOYMENT CHECKLIST:
+  //   1. Build Command : npm run build
+  //   2. Start Command : npm run preview
+  //   3. Environment tab — add all VITE_FIREBASE_* variables:
+  //        VITE_FIREBASE_API_KEY
+  //        VITE_FIREBASE_AUTH_DOMAIN
+  //        VITE_FIREBASE_PROJECT_ID
+  //        VITE_FIREBASE_STORAGE_BUCKET
+  //        VITE_FIREBASE_MESSAGING_SENDER_ID
+  //        VITE_FIREBASE_APP_ID
+  //      Without these the app builds but Firebase fails at runtime.
+  preview: {
+    host: "0.0.0.0",
+    port: Number(process.env.PORT) || 5173,
+    strictPort: false,
+  },
 }));

@@ -1,9 +1,10 @@
 interface HomeProps {
   addToCart: (item: { id: string; name: string; price: number }) => void;
+  onNavigate: (page: "menu" | "reservations" | "cart") => void;
 }
 
-export default function Home({ addToCart }: HomeProps) {
-  const currentYear = new Date().getFullYear();
+export default function Home({ addToCart: _addToCart, onNavigate }: HomeProps) {
+
 
   return (
     <div className="min-h-screen">
@@ -19,13 +20,13 @@ export default function Home({ addToCart }: HomeProps) {
               Deliciously Crafted Meals, Served with Love
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-8 py-4 bg-white text-orange-600 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg shadow-lg">
+              <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-white text-orange-600 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg shadow-lg">
                 🍽️ Order Now
               </button>
-              <button className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
+              <button onClick={() => onNavigate("reservations")} className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
                 📅 Book a Table
               </button>
-              <button className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
+              <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
                 📖 View Menu
               </button>
             </div>
@@ -93,7 +94,7 @@ export default function Home({ addToCart }: HomeProps) {
           </div>
 
           <div className="text-center">
-            <button className="px-8 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold text-lg">
+            <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold text-lg">
               View Full Menu
             </button>
           </div>
@@ -175,10 +176,10 @@ export default function Home({ addToCart }: HomeProps) {
             we're here to serve you the best culinary experience.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-white text-orange-600 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg">
+            <button onClick={() => onNavigate("reservations")} className="px-8 py-4 bg-white text-orange-600 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg">
               📅 Book a Table
             </button>
-            <button className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
+            <button onClick={() => onNavigate("menu")} className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg hover:bg-white hover:text-orange-600 transition-colors font-semibold text-lg">
               🛒 Order Now
             </button>
           </div>
@@ -400,7 +401,7 @@ export default function Home({ addToCart }: HomeProps) {
       </section>
 
       {/* 10. Footer */}
-      <footer className="bg-gray-900 text-white py-12">
+      {/* <footer className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
@@ -463,7 +464,7 @@ export default function Home({ addToCart }: HomeProps) {
             </p>
           </div>
         </div>
-      </footer>
+      </footer> */}
     </div>
   );
 }

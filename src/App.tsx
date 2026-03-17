@@ -18,6 +18,20 @@ import { useAuth } from "./context/AuthContext";
 
 type Page = "home" | "menu" | "cart" | "reservations" | "orders" | "admin";
 
+const VALID_PAGES: Page[] = [
+  "home",
+  "menu",
+  "cart",
+  "reservations",
+  "orders",
+  "admin",
+];
+
+function getPageFromHash(hash: string): Page {
+  const page = hash.replace(/^#/, "") as Page;
+  return VALID_PAGES.includes(page) ? page : "home";
+}
+
 export interface CartItem {
   id: string;
   name: string;
@@ -26,11 +40,42 @@ export interface CartItem {
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("home");
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    if (typeof window === "undefined") {
+      return "home";
+    }
+
+    return getPageFromHash(window.location.hash);
+  });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [userRole, setUserRole] = useState<string>("customer");
   const { user, loading } = useAuth();
   const [_roleLoading, setRoleLoading] = useState(false);
+
+  const navigateToPage = (page: Page) => {
+    setCurrentPage(page);
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentPage(getPageFromHash(window.location.hash));
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    handleHashChange();
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const nextHash = `#${currentPage}`;
+
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, "", nextHash);
+    }
+  }, [currentPage]);
 
   // Fetch user role whenever user changes
   useEffect(() => {
@@ -130,7 +175,7 @@ export default function App() {
   const renderPage = () => {
     switch (currentPage) {
       case "home":
-        return <Home addToCart={addToCart} onNavigate={setCurrentPage} />;
+        return <Home addToCart={addToCart} onNavigate={navigateToPage} />;
       case "menu":
         return <Menu addToCart={addToCart} />;
       case "cart":
@@ -141,7 +186,7 @@ export default function App() {
             clearCart={clearCart}
             onOrderComplete={() => {
               clearCart();
-              setCurrentPage("orders");
+              navigateToPage("orders");
             }}
             userId={user?.uid}
           />
@@ -153,7 +198,7 @@ export default function App() {
       case "admin":
         return <AdminDashboard userId={user?.uid} userRole={userRole} />;
       default:
-        return <Home addToCart={addToCart} onNavigate={setCurrentPage} />;
+        return <Home addToCart={addToCart} onNavigate={navigateToPage} />;
     }
   };
 
@@ -194,7 +239,7 @@ export default function App() {
               ].map((link) => (
                 <button
                   key={link.id}
-                  onClick={() => setCurrentPage(link.id)}
+                  onClick={() => navigateToPage(link.id)}
                   className={`px-4 py-2 rounded-lg transition-all duration-200 ${
                     currentPage === link.id
                       ? "bg-amber-600 text-white"
@@ -209,7 +254,7 @@ export default function App() {
               {user && (
                 <>
                   <button
-                    onClick={() => setCurrentPage("orders")}
+                    onClick={() => navigateToPage("orders")}
                     className={`px-4 py-2 rounded-lg transition-all duration-200 ${
                       currentPage === "orders"
                         ? "bg-amber-600 text-white"
@@ -221,7 +266,7 @@ export default function App() {
 
                   {(userRole === "admin" || userRole === "staff") && (
                     <button
-                      onClick={() => setCurrentPage("admin")}
+                      onClick={() => navigateToPage("admin")}
                       className={`px-4 py-2 rounded-lg transition-all duration-200 font-semibold ${
                         currentPage === "admin"
                           ? "bg-red-600 text-white"
@@ -239,7 +284,7 @@ export default function App() {
             <div className="flex items-center space-x-4">
               {/* Cart Icon */}
               <button
-                onClick={() => setCurrentPage("cart")}
+                onClick={() => navigateToPage("cart")}
                 className="relative flex items-center space-x-2 px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 transition-all"
               >
                 <span className="text-xl">🛒</span>

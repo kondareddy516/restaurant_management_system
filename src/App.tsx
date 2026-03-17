@@ -61,6 +61,7 @@ export default function App() {
   });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [userRole, setUserRole] = useState<string>("customer");
+  const [cartSyncAvailable, setCartSyncAvailable] = useState(true);
   const { user, loading } = useAuth();
   const [_roleLoading, setRoleLoading] = useState(false);
 
@@ -130,16 +131,28 @@ export default function App() {
   useEffect(() => {
     if (!user?.uid) {
       setCart([]);
+      setCartSyncAvailable(true);
       return;
     }
+
+    setCartSyncAvailable(true);
 
     const unsubscribe = userCartService.subscribe(
       user.uid,
       (items) => {
         setCart(items);
       },
-      (error) => {
+      (error: any) => {
         console.error("Error syncing cart:", error);
+
+        if (error?.code === "permission-denied") {
+          setCartSyncAvailable(false);
+          toast.error(
+            "Royal Cart cloud sync is not permitted. Please publish userCarts Firestore rules.",
+          );
+          return;
+        }
+
         toast.error("Failed to sync Royal Cart");
       },
     );
@@ -159,10 +172,12 @@ export default function App() {
           )
         : [...prev, { ...item, quantity: 1 }];
 
-      if (user?.uid) {
+      if (user?.uid && cartSyncAvailable) {
         void userCartService.setCart(user.uid, nextCart).catch((error) => {
           console.error("Error persisting cart item:", error);
-          toast.error("Failed to update Royal Cart");
+          if (error?.code !== "permission-denied") {
+            toast.error("Failed to update Royal Cart");
+          }
         });
       }
 
@@ -180,10 +195,12 @@ export default function App() {
               item.id === id ? { ...item, quantity } : item,
             );
 
-      if (user?.uid) {
+      if (user?.uid && cartSyncAvailable) {
         void userCartService.setCart(user.uid, nextCart).catch((error) => {
           console.error("Error updating cart quantity:", error);
-          toast.error("Failed to update Royal Cart");
+          if (error?.code !== "permission-denied") {
+            toast.error("Failed to update Royal Cart");
+          }
         });
       }
 
@@ -194,10 +211,12 @@ export default function App() {
   const clearCart = () => {
     setCart([]);
 
-    if (user?.uid) {
+    if (user?.uid && cartSyncAvailable) {
       void userCartService.clear(user.uid).catch((error) => {
         console.error("Error clearing cart:", error);
-        toast.error("Failed to clear Royal Cart");
+        if (error?.code !== "permission-denied") {
+          toast.error("Failed to clear Royal Cart");
+        }
       });
     }
   };

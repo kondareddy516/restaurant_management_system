@@ -114,10 +114,10 @@ export default function Reservations() {
         time: time || "",
         numberOfGuests: numberOfGuests || 1,
         specialRequests: specialRequests || "",
-        status: "pending",
+        status: "confirmed",
       });
 
-      toast.success("Reservation request submitted successfully!", {
+      toast.success("Reservation confirmed successfully!", {
         style: {
           backgroundColor: "#2D0B0B",
           color: "#F3E5AB",
@@ -410,7 +410,9 @@ export default function Reservations() {
                         </p>
                       )}
                     </div>
-                    {reservation.status === "pending" && reservation.id && (
+                    {(reservation.status === "pending" ||
+                      reservation.status === "confirmed") &&
+                      reservation.id && (
                       <button
                         onClick={() => handleCancel(reservation.id!)}
                         className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium"

@@ -454,7 +454,7 @@ export const reservationService = {
   ): Promise<string> {
     const docRef = await addDoc(collection(db, "reservations"), {
       ...reservation,
-      status: "pending",
+      status: reservation.status || "pending",
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });

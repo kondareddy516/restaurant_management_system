@@ -97,6 +97,20 @@ service cloud.firestore {
     }
 
     // ============================================
+    // USER CARTS - User Scoped Cart Sync
+    // ============================================
+    match /userCarts/{userId} {
+      // Users can read only their own cart
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      // Users can create/update only their own cart
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+
+      // Users can delete only their own cart
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
     // HELPER FUNCTIONS
     // ============================================
 
@@ -123,6 +137,7 @@ service cloud.firestore {
 | reservations | ✓ Own/Admin | ✓ Auth  | ✓ Own/Admin | ✗ Admin |
 | userRoles    | ✗ Admin     | ✗ Admin | ✗ Admin     | ✗ Admin |
 | users        | ✓ Own       | ✓ Own   | ✓ Own       | ✗ Admin |
+| userCarts    | ✓ Own       | ✓ Own   | ✓ Own       | ✓ Own   |
 
 ## 🛠️ Development (Testing Only)
 

@@ -1,3 +1,5 @@
+## 🚀 Live Demo
+https://restaurant-management-system-rsxp.onrender.com
 # RestaurantHub - High-End Restaurant Management System
 
 A modern, Firebase-powered restaurant management system with premium UPI payment integration, real-time order tracking, and reservation management.

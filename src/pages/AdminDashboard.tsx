@@ -34,8 +34,8 @@ const getCategoryPriceLimit = (category: MenuCategory) =>
   MENU_PRICE_LIMITS[category];
 
 export default function AdminDashboard({
-  userId,
-  userRole,
+  userId: _userId,
+  userRole: _userRole,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
     "orders" | "reservations" | "menu"
@@ -110,7 +110,7 @@ function OrdersManagement() {
       }
     };
 
-    fetchOrders();
+    void fetchOrders();
   }, []);
 
   const handleStatusUpdate = async (
@@ -414,7 +414,9 @@ function OrdersManagement() {
                     Back
                   </button>
                   <button
-                    onClick={handlePaymentVerification}
+                    onClick={() => {
+                      void handlePaymentVerification();
+                    }}
                     disabled={
                       isSubmittingPayment ||
                       (paymentAction === "rejected" && !rejectionReason.trim())
@@ -468,7 +470,7 @@ function ReservationsManagement() {
       }
     };
 
-    fetchReservations();
+    void fetchReservations();
   }, []);
 
   const handleStatusUpdate = async (
@@ -677,7 +679,7 @@ function MenuManagement() {
       }
     };
 
-    fetchMenuItems();
+    void fetchMenuItems();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

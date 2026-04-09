@@ -20,6 +20,19 @@ interface AdminDashboardProps {
   userRole: string;
 }
 
+type MenuCategory = "starters" | "veg" | "non-veg" | "desserts";
+
+const MENU_PRICE_LIMITS: Partial<
+  Record<MenuCategory, { min: number; max: number }>
+> = {
+  veg: { min: 100, max: 150 },
+  "non-veg": { min: 120, max: 200 },
+  desserts: { min: 60, max: 130 },
+};
+
+const getCategoryPriceLimit = (category: MenuCategory) =>
+  MENU_PRICE_LIMITS[category];
+
 export default function AdminDashboard({
   userId,
   userRole,
@@ -643,7 +656,7 @@ function MenuManagement() {
     name: "",
     description: "",
     price: 0,
-    category: "starters" as "starters" | "veg" | "non-veg" | "desserts",
+    category: "starters" as MenuCategory,
     preparationTime: 15,
     available: true,
   });
@@ -669,6 +682,18 @@ function MenuManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const priceLimit = getCategoryPriceLimit(formData.category);
+    if (
+      priceLimit &&
+      (formData.price < priceLimit.min || formData.price > priceLimit.max)
+    ) {
+      toast.error(
+        `${formData.category} items must be priced between ₹${priceLimit.min} and ₹${priceLimit.max}.`,
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -701,6 +726,8 @@ function MenuManagement() {
       setIsSubmitting(false);
     }
   };
+
+  const currentPriceLimit = getCategoryPriceLimit(formData.category);
 
   const handleEdit = (item: MenuItem) => {
     setEditingId(item.id || null);
@@ -783,9 +810,26 @@ function MenuManagement() {
               <select
                 value={formData.category}
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    category: e.target.value as any,
+                  setFormData((previousFormData) => {
+                    const nextCategory = e.target.value as MenuCategory;
+                    const nextPriceLimit = getCategoryPriceLimit(nextCategory);
+                    const nextPrice = nextPriceLimit
+                      ? Math.min(
+                          nextPriceLimit.max,
+                          Math.max(
+                            nextPriceLimit.min,
+                            Number.isFinite(previousFormData.price)
+                              ? previousFormData.price
+                              : nextPriceLimit.min,
+                          ),
+                        )
+                      : previousFormData.price;
+
+                    return {
+                      ...previousFormData,
+                      category: nextCategory,
+                      price: nextPrice,
+                    };
                   })
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
@@ -804,16 +848,24 @@ function MenuManagement() {
               <input
                 type="number"
                 step="0.01"
+                min={currentPriceLimit?.min}
+                max={currentPriceLimit?.max}
                 value={formData.price}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    price: parseFloat(e.target.value),
+                    price: Number(e.target.value),
                   })
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 required
               />
+              {currentPriceLimit && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Allowed range: ₹{currentPriceLimit.min} - ₹
+                  {currentPriceLimit.max}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

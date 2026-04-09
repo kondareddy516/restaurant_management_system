@@ -54,6 +54,31 @@ async function fetchWithRetry<T>(
 
 type Category = "starters" | "veg" | "non-veg" | "desserts";
 
+const CATEGORY_PRICE_LIMITS: Partial<
+  Record<Category, { min: number; max: number }>
+> = {
+  veg: { min: 100, max: 150 },
+  "non-veg": { min: 120, max: 200 },
+  desserts: { min: 60, max: 130 },
+};
+
+const normalizeMenuItemPrice = (item: MenuItem): MenuItem => {
+  const limits = CATEGORY_PRICE_LIMITS[item.category as Category];
+  if (!limits) {
+    return item;
+  }
+
+  const clampedPrice = Math.min(limits.max, Math.max(limits.min, item.price));
+  if (clampedPrice === item.price) {
+    return item;
+  }
+
+  return {
+    ...item,
+    price: clampedPrice,
+  };
+};
+
 // Royal Fallback Menu Data - Used when Firestore is unavailable
 const ROYAL_FALLBACK_MENU: MenuItem[] = [
   {
@@ -71,7 +96,7 @@ const ROYAL_FALLBACK_MENU: MenuItem[] = [
     name: "🏛️ Creamed Cottage Cheese in Tomato Reduction",
     description:
       "Exquisite celebration of fresh vegetables and paneer, balanced with nutrition and indulgence.",
-    price: 22.99,
+    price: 129,
     category: "veg",
     available: true,
     preparationTime: 15,
@@ -81,7 +106,7 @@ const ROYAL_FALLBACK_MENU: MenuItem[] = [
     name: "🏛️ Mogul Tomato Cream Poultry",
     description:
       "Premium proteins sourced from finest purveyors, representing the pinnacle of culinary artistry.",
-    price: 29.99,
+    price: 179,
     category: "non-veg",
     available: true,
     preparationTime: 18,
@@ -91,7 +116,7 @@ const ROYAL_FALLBACK_MENU: MenuItem[] = [
     name: "🏛️ Artisanal Cocoa Decadence",
     description:
       "Handcrafted sweetmeat providing a memorable conclusion to your Royal dining experience.",
-    price: 14.99,
+    price: 99,
     category: "desserts",
     available: true,
     preparationTime: 8,
@@ -201,7 +226,7 @@ export default function Menu({ addToCart }: MenuProps) {
           throw new Error("No menu items available");
         }
 
-        setMenuItems(items);
+        setMenuItems(items.map(normalizeMenuItemPrice));
         setError(null);
       } catch (err) {
         const error = err as any;
@@ -234,7 +259,7 @@ export default function Menu({ addToCart }: MenuProps) {
                   (item) => item.category === selectedCategory,
                 );
 
-          setMenuItems(fallbackItems);
+          setMenuItems(fallbackItems.map(normalizeMenuItemPrice));
         } else if (errorMessage.includes("No menu items available")) {
           setError(
             "No items available in this category. Please try another category.",
@@ -259,7 +284,7 @@ export default function Menu({ addToCart }: MenuProps) {
 
           if (fallbackItems.length > 0) {
             toast.info("🏛️ Using Royal Fallback Menu");
-            setMenuItems(fallbackItems);
+            setMenuItems(fallbackItems.map(normalizeMenuItemPrice));
           }
         }
       } finally {
@@ -267,7 +292,7 @@ export default function Menu({ addToCart }: MenuProps) {
       }
     };
 
-    fetchMenuItems();
+    void fetchMenuItems();
   }, [selectedCategory]);
 
   const handleAddToCart = (item: MenuItem) => {
